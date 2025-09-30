@@ -1,0 +1,33 @@
+=== MAACLI CLUSTER EXPLANATIONS ===
+
+1. DECISION TREE RULES:
+|--- cost_sum <= 127412856.00
+|   |--- dead_sum <= 21.50
+|   |   |--- has_food_sum <= 45.50
+|   |   |   |--- recurrence_rate <= 4.58
+|   |   |   |   |--- class: 2
+|   |   |   |--- recurrence_rate >  4.58
+|   |   |   |   |--- class: 2
+|   |   |--- has_food_sum >  45.50
+|   |   |   |--- class: 0
+|   |--- dead_sum >  21.50
+|   |   |--- class: 1
+|--- cost_sum >  127412856.00
+|   |--- injured_ill_sum <= 12.00
+|   |   |--- class: 0
+|   |--- injured_ill_sum >  12.00
+|   |   |--- class: 1
+
+2. CLUSTER DESCRIPTIONS:
+**Cluster 0**:
+- cost_sum: 75% between 87559243.16 and 206898335.28
+- has_food_sum: 75% between 38.00 and 80.00
+- dead_sum: 75% between 2.00 and 16.00
+**Cluster 1**:
+- cost_sum: 75% between 65528086.86 and 192338147.88
+- has_food_sum: 75% between 23.00 and 56.50
+- dead_sum: 75% between 55.50 and 78.00
+**Cluster 2**:
+- cost_sum: 75% between 314880.00 and 38721840.31
+- has_food_sum: 75% between 1.00 and 19.00
+- dead_sum: 75% between 0.00 and 2.75
