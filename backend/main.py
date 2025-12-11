@@ -1,183 +1,349 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import joblib
 import numpy as np
 import pandas as pd
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import os
 
 app = FastAPI(
-    title="Typhoon Impact Prediction API",
-    description="API for predicting typhoon impacts and clustering analysis",
+    title="Typhoon Impact Clustering & Prediction API",
+    description="API for clustering typhoon impact levels and predicting damage severity",
     version="1.0.0"
 )
 
 # Enable CORS for frontend requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Pydantic models for request/response
-class PredictionRequest(BaseModel):
-    typhoon_name: str
-    province: str
-    max_wind_speed: float
-    rainfall_24hr: float
-    storm_duration: int
-    population: int
+# ==================== Pydantic Models ====================
 
-class PredictionResponse(BaseModel):
-    predicted_casualties: int
-    predicted_damage_cost: float
-    risk_level: str
-    confidence: float
+class ClusteringInput(BaseModel):
+    """Input features for clustering prediction"""
+    families: float = Field(..., description="Number of families affected")
+    persons: float = Field(..., description="Number of persons affected")
+    barangays: float = Field(..., description="Number of barangays affected", alias="barangays_affected")
+    dead: float = Field(..., description="Number of deaths")
+    injured_ill: float = Field(..., description="Number of injured/ill")
+    missing: float = Field(..., description="Number of missing persons")
+    totally_damaged: float = Field(..., description="Totally damaged houses")
+    partially_damaged: float = Field(..., description="Partially damaged houses")
+    cost: float = Field(..., description="Cost of damage in PHP")
+    duration_hrs: float = Field(..., description="Duration in hours")
+    max_sustained_wind: float = Field(..., description="Maximum sustained wind in kph")
+    typhoon_type: int = Field(..., description="Typhoon type (TS=0, TD=1, STS=2, TY=3, STY=4)")
+    max_24hr_rainfall: float = Field(..., description="Maximum 24hr rainfall in mm")
+    total_storm_rainfall: float = Field(..., description="Total storm rainfall in mm")
+    min_pressure: float = Field(..., description="Minimum pressure in hPa")
+    region: int = Field(..., description="Region number (1-17)")
 
-class ClusterRequest(BaseModel):
-    typhoon_data: List[Dict[str, Any]]
+    class Config:
+        populate_by_name = True
 
-class ClusterResponse(BaseModel):
-    cluster_assignments: List[int]
-    cluster_centers: List[Dict[str, float]]
-    silhouette_score: float
 
-# Load models (create dummy ones if not exist)
-def load_or_create_models():
-    """Load existing models or create dummy ones for demonstration"""
-    models = {}
+class ClusteringResponse(BaseModel):
+    """Response from clustering prediction"""
+    cluster: int
+    level: int
+    severity_label: str
+    severity_score: float
+    description: str
+
+
+class ForecastInput(BaseModel):
+    """Input features for damage prediction (Future Prediction)"""
+    max_sustained_wind: float = Field(..., description="Maximum sustained wind in kph")
+    typhoon_type: Optional[int] = Field(None, description="Typhoon type (optional for LR)")
+    max_24hr_rainfall: float = Field(..., description="Maximum 24hr rainfall in mm")
+    total_storm_rainfall: float = Field(..., description="Total storm rainfall in mm")
+    min_pressure: float = Field(..., description="Minimum pressure in hPa")
+    duration: float = Field(..., description="Duration in hours")
+
+
+class ForecastResponse(BaseModel):
+    """Response from damage prediction"""
+    families: float
+    persons: float
+    barangays: float
+    dead: float
+    injured_ill: float
+    missing: float
+    cost: float
+    partially_damaged: float
+    totally_damaged: float
+    message: str
+
+
+class HealthResponse(BaseModel):
+    """Health check response"""
+    status: str
+    clustering_model_loaded: bool
+    prediction_model_loaded: bool
+    version: str
+
+
+# ==================== Model Loading ====================
+
+# Global model storage
+models = {
+    'clustering': None,
+    'scaler': None,
+    'severity_classifications': None,
+    'level_mapping': None,
+    'feature_columns': None,
+    'prediction': None
+}
+
+
+def load_clustering_models():
+    """Load clustering models from the models/clustering directory"""
+    clustering_dir = os.path.join(os.path.dirname(__file__), '..', 'models', 'clustering')
     
     try:
-        # Try to load existing models
-        models['prediction'] = joblib.load('models/prediction_model.joblib')
-        models['clustering'] = joblib.load('models/clustering_model.joblib')
-    except:
-        # Create dummy models if files don't exist
-        from sklearn.ensemble import RandomForestRegressor
-        from sklearn.cluster import KMeans
-        
-        # Create dummy prediction model
-        dummy_X = np.random.rand(100, 6)  # 6 features
-        dummy_y = np.random.randint(0, 100, 100)  # casualty prediction
-        prediction_model = RandomForestRegressor(n_estimators=10, random_state=42)
-        prediction_model.fit(dummy_X, dummy_y)
-        
-        # Create dummy clustering model
-        cluster_model = KMeans(n_clusters=5, random_state=42)
-        cluster_model.fit(dummy_X)
-        
-        models['prediction'] = prediction_model
-        models['clustering'] = cluster_model
-        
-        # Save models
-        os.makedirs('models', exist_ok=True)
-        joblib.dump(prediction_model, 'models/prediction_model.joblib')
-        joblib.dump(cluster_model, 'models/clustering_model.joblib')
+        models['clustering'] = joblib.load(os.path.join(clustering_dir, 'clustering_model.joblib'))
+        models['scaler'] = joblib.load(os.path.join(clustering_dir, 'scaler.joblib'))
+        models['severity_classifications'] = joblib.load(os.path.join(clustering_dir, 'severity_classifications.joblib'))
+        models['level_mapping'] = joblib.load(os.path.join(clustering_dir, 'level_mapping.joblib'))
+        models['feature_columns'] = joblib.load(os.path.join(clustering_dir, 'feature_columns.joblib'))
+        print("✓ Clustering models loaded successfully")
+        return True
+    except FileNotFoundError as e:
+        print(f"⚠ Clustering models not found: {e}")
+        print("  Please run the notebook to export the models first.")
+        return False
+    except Exception as e:
+        print(f"⚠ Error loading clustering models: {e}")
+        return False
+
+
+def load_prediction_models():
+    """Load prediction models from the models/prediction directory"""
+    prediction_dir = os.path.join(os.path.dirname(__file__), '..', 'models', 'prediction')
     
-    return models
+    try:
+        models['prediction'] = joblib.load(os.path.join(prediction_dir, 'prediction_model.joblib'))
+        print("✓ Prediction models loaded successfully")
+        return True
+    except FileNotFoundError:
+        print("⚠ Prediction models not found (not yet implemented)")
+        return False
+    except Exception as e:
+        print(f"⚠ Error loading prediction models: {e}")
+        return False
+
 
 # Load models at startup
-models = load_or_create_models()
+@app.on_event("startup")
+async def startup_event():
+    """Load all models when the application starts"""
+    print("=" * 60)
+    print("Starting Typhoon Impact API...")
+    print("=" * 60)
+    load_clustering_models()
+    load_prediction_models()
+    print("=" * 60)
 
-@app.get("/")
+
+# ==================== API Endpoints ====================
+
+@app.get("/", tags=["Root"])
 async def root():
-    return {"message": "Typhoon Impact Prediction API", "status": "active"}
+    """Root endpoint with API information"""
+    return {
+        "message": "Typhoon Impact Clustering & Prediction API",
+        "version": "1.0.0",
+        "endpoints": {
+            "clustering": "/cluster",
+            "prediction": "/forecast",
+            "health": "/api/health",
+            "docs": "/docs"
+        }
+    }
 
-@app.post("/api/predict", response_model=PredictionResponse)
-async def predict_impact(request: PredictionRequest):
-    """Predict typhoon impact based on input features"""
+
+@app.get("/api/health", response_model=HealthResponse, tags=["Health"])
+async def health_check():
+    """Health check endpoint"""
+    return HealthResponse(
+        status="healthy",
+        clustering_model_loaded=models['clustering'] is not None,
+        prediction_model_loaded=models['prediction'] is not None,
+        version="1.0.0"
+    )
+
+
+@app.post("/cluster", response_model=ClusteringResponse, tags=["Clustering"])
+async def predict_cluster(input_data: ClusteringInput):
+    """
+    Predict the cluster level (1, 2, or 3) for typhoon impact data.
+    
+    Typhoon Type Encoding:
+    - TS (Tropical Storm) = 0
+    - TD (Tropical Depression) = 1
+    - STS (Severe Tropical Storm) = 2
+    - TY (Typhoon) = 3
+    - STY (Super Typhoon) = 4
+    """
+    if models['clustering'] is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Clustering model not loaded. Please run the notebook to export models."
+        )
+    
     try:
-        # Prepare features for prediction
+        # Create one-hot encoded region columns (regions 1-17)
+        region_columns = {f'region_{i}': 0 for i in range(1, 18)}
+        if 1 <= input_data.region <= 17:
+            region_columns[f'region_{input_data.region}'] = 1
+        
+        # Build feature dictionary matching the training data columns
+        feature_dict = {
+            'families': input_data.families,
+            'person': input_data.persons,
+            'dead': input_data.dead,
+            'injured/ill': input_data.injured_ill,
+            'missing': input_data.missing,
+            'totally': input_data.totally_damaged,
+            'partially': input_data.partially_damaged,
+            'cost': input_data.cost,
+            'duration_in_par_hours': input_data.duration_hrs,
+            'max_sustained_wind_kph': input_data.max_sustained_wind,
+            'typhoon_type': input_data.typhoon_type,
+            'max_24hr_rainfall_mm': input_data.max_24hr_rainfall,
+            'total_storm_rainfall_mm': input_data.total_storm_rainfall,
+            'min_pressure_hpa': input_data.min_pressure,
+        }
+        
+        # Add region one-hot columns
+        feature_dict.update(region_columns)
+        
+        # Create DataFrame with proper column order
+        feature_df = pd.DataFrame([feature_dict])
+        
+        # Ensure columns match the trained model's expected features
+        expected_columns = models['feature_columns']
+        
+        # Add missing columns with 0 and reorder
+        for col in expected_columns:
+            if col not in feature_df.columns:
+                feature_df[col] = 0
+        
+        feature_df = feature_df[expected_columns]
+        
+        # Scale the features
+        scaled_features = models['scaler'].transform(feature_df.values)
+        
+        # Predict cluster
+        cluster = int(models['clustering'].predict(scaled_features)[0])
+        
+        # Get severity info
+        severity_info = models['severity_classifications'].get(cluster, {})
+        level = models['level_mapping'].get(cluster, cluster + 1)
+        
+        # Generate description based on level
+        descriptions = {
+            1: "High-Impact: Severe typhoon with significant casualties, extensive property damage, and large affected populations.",
+            2: "Moderate-Impact: Moderate severity event with noticeable damage concentrated in specific regions.",
+            3: "Low-Impact: Lower severity event with minimal casualties and limited property damage."
+        }
+        
+        return ClusteringResponse(
+            cluster=cluster,
+            level=level,
+            severity_label=severity_info.get('label', f'Level {level}'),
+            severity_score=severity_info.get('severity_score', 0.0),
+            description=descriptions.get(level, "Impact level determined by clustering analysis.")
+        )
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Clustering prediction error: {str(e)}")
+
+
+@app.post("/forecast", response_model=ForecastResponse, tags=["Prediction"])
+async def predict_damage(input_data: ForecastInput):
+    """
+    Predict damage metrics based on weather features.
+    
+    Note: This endpoint is not yet implemented. The prediction model needs to be trained first.
+    """
+    if models['prediction'] is None:
+        # Return placeholder response indicating feature is not ready
+        return ForecastResponse(
+            families=0,
+            persons=0,
+            barangays=0,
+            dead=0,
+            injured_ill=0,
+            missing=0,
+            cost=0,
+            partially_damaged=0,
+            totally_damaged=0,
+            message="Prediction model not yet available. This feature is coming soon."
+        )
+    
+    try:
+        # Build feature array for prediction
         features = np.array([[
-            request.max_wind_speed,
-            request.rainfall_24hr,
-            request.storm_duration,
-            request.population,
-            hash(request.province) % 100,  # Province encoding
-            len(request.typhoon_name)  # Simple typhoon name feature
+            input_data.max_sustained_wind,
+            input_data.typhoon_type if input_data.typhoon_type is not None else 0,
+            input_data.max_24hr_rainfall,
+            input_data.total_storm_rainfall,
+            input_data.min_pressure,
+            input_data.duration
         ]])
         
-        # Make prediction
-        prediction = models['prediction'].predict(features)[0]
+        # Make predictions
+        predictions = models['prediction'].predict(features)
         
-        # Calculate risk level based on prediction
-        if prediction < 10:
-            risk_level = "Low"
-            confidence = 0.85
-        elif prediction < 50:
-            risk_level = "Medium"
-            confidence = 0.78
-        else:
-            risk_level = "High"
-            confidence = 0.92
-        
-        # Calculate estimated damage cost (simplified)
-        damage_cost = prediction * 50000 + (request.max_wind_speed * 1000)
-        
-        return PredictionResponse(
-            predicted_casualties=int(prediction),
-            predicted_damage_cost=float(damage_cost),
-            risk_level=risk_level,
-            confidence=confidence
+        return ForecastResponse(
+            families=float(predictions[0][0]),
+            persons=float(predictions[0][1]),
+            barangays=float(predictions[0][2]),
+            dead=float(predictions[0][3]),
+            injured_ill=float(predictions[0][4]),
+            missing=float(predictions[0][5]),
+            cost=float(predictions[0][6]),
+            partially_damaged=float(predictions[0][7]),
+            totally_damaged=float(predictions[0][8]),
+            message="Prediction successful"
         )
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
-@app.post("/api/cluster", response_model=ClusterResponse)
-async def cluster_analysis(request: ClusterRequest):
-    """Perform clustering analysis on typhoon data"""
-    try:
-        if not request.typhoon_data:
-            raise HTTPException(status_code=400, detail="No typhoon data provided")
-        
-        # Convert typhoon data to features matrix
-        features_list = []
-        for typhoon in request.typhoon_data:
-            features = [
-                typhoon.get('wind_speed', 0),
-                typhoon.get('rainfall', 0),
-                typhoon.get('duration', 0),
-                typhoon.get('casualties', 0),
-                typhoon.get('damage_cost', 0),
-                len(typhoon.get('name', ''))
-            ]
-            features_list.append(features)
-        
-        features_matrix = np.array(features_list)
-        
-        # Perform clustering
-        cluster_assignments = models['clustering'].predict(features_matrix).tolist()
-        
-        # Get cluster centers
-        centers = models['clustering'].cluster_centers_
-        cluster_centers = []
-        feature_names = ['wind_speed', 'rainfall', 'duration', 'casualties', 'damage_cost', 'name_length']
-        
-        for center in centers:
-            center_dict = {name: float(value) for name, value in zip(feature_names, center)}
-            cluster_centers.append(center_dict)
-        
-        # Calculate dummy silhouette score
-        silhouette_score = 0.75 + (np.random.random() * 0.2)  # Dummy score between 0.75-0.95
-        
-        return ClusterResponse(
-            cluster_assignments=cluster_assignments,
-            cluster_centers=cluster_centers,
-            silhouette_score=silhouette_score
+
+@app.get("/api/maacli", tags=["MAACLI"])
+async def get_maacli_insights():
+    """Get MAACLI framework insights about the clustering model"""
+    if models['severity_classifications'] is None:
+        raise HTTPException(
+            status_code=503,
+            detail="MAACLI insights not available. Please run the notebook first."
         )
     
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Clustering error: {str(e)}")
+    insights = {
+        "clusters": [],
+        "level_mapping": models['level_mapping'],
+        "feature_count": len(models['feature_columns']) if models['feature_columns'] else 0
+    }
+    
+    for cluster_id, info in models['severity_classifications'].items():
+        insights["clusters"].append({
+            "cluster_id": cluster_id,
+            "label": info['label'],
+            "severity_score": info['severity_score'],
+            "rank": info['rank']
+        })
+    
+    return insights
 
-@app.get("/api/health")
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "models_loaded": len(models)}
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)

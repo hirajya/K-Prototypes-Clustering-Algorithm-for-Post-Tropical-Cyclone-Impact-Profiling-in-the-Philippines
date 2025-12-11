@@ -1,6 +1,4 @@
 {
-  "/thesis/page": "app/thesis/page.js",
-  "/cluster/page": "app/cluster/page.js",
   "/page": "app/page.js",
-  "/prediction/page": "app/prediction/page.js"
+  "/cluster/page": "app/cluster/page.js"
 }

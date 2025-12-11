@@ -1,238 +1,356 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
-interface ClusterResult {
-  cluster_assignments: number[]
-  cluster_centers: Array<{
-    wind_speed: number
-    rainfall: number
-    duration: number
-    casualties: number
-    damage_cost: number
-    name_length: number
-  }>
-  silhouette_score: number
+interface ClusteringResult {
+  cluster: number
+  level: number
+  severity_label: string
+  severity_score: number
+  description: string
 }
 
+interface FormData {
+  families: string
+  persons: string
+  barangays: string
+  dead: string
+  injured_ill: string
+  missing: string
+  totally_damaged: string
+  partially_damaged: string
+  cost: string
+  duration_hrs: string
+  max_sustained_wind: string
+  typhoon_type: string
+  max_24hr_rainfall: string
+  total_storm_rainfall: string
+  min_pressure: string
+  region: string
+}
+
+const initialFormData: FormData = {
+  families: '',
+  persons: '',
+  barangays: '',
+  dead: '',
+  injured_ill: '',
+  missing: '',
+  totally_damaged: '',
+  partially_damaged: '',
+  cost: '',
+  duration_hrs: '',
+  max_sustained_wind: '',
+  typhoon_type: '0',
+  max_24hr_rainfall: '',
+  total_storm_rainfall: '',
+  min_pressure: '',
+  region: '1',
+}
+
+const typhoonTypes = [
+  { value: '0', label: 'TS - Tropical Storm' },
+  { value: '1', label: 'TD - Tropical Depression' },
+  { value: '2', label: 'STS - Severe Tropical Storm' },
+  { value: '3', label: 'TY - Typhoon' },
+  { value: '4', label: 'STY - Super Typhoon' },
+]
+
+const regions = Array.from({ length: 17 }, (_, i) => ({
+  value: String(i + 1),
+  label: `Region ${i + 1}`,
+}))
+
 export default function ClusterPage() {
-  const [clusterData, setClusterData] = useState<ClusterResult | null>(null)
+  const [formData, setFormData] = useState<FormData>(initialFormData)
+  const [result, setResult] = useState<ClusteringResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Sample typhoon data for clustering
-  const sampleTyphoons = [
-    { name: 'Yolanda', wind_speed: 195, rainfall: 400, duration: 48, casualties: 6300, damage_cost: 5900000000 },
-    { name: 'Ondoy', wind_speed: 95, rainfall: 455, duration: 24, casualties: 464, damage_cost: 11000000000 },
-    { name: 'Pablo', wind_speed: 175, rainfall: 200, duration: 36, casualties: 1900, damage_cost: 6800000000 },
-    { name: 'Lando', wind_speed: 190, rainfall: 300, duration: 72, casualties: 58, damage_cost: 15000000000 },
-    { name: 'Nina', wind_speed: 150, rainfall: 250, duration: 48, casualties: 12, damage_cost: 2300000000 },
-    { name: 'Ompong', wind_speed: 170, rainfall: 350, duration: 60, casualties: 81, damage_cost: 33000000000 },
-    { name: 'Ulysses', wind_speed: 130, rainfall: 200, duration: 36, casualties: 73, damage_cost: 18000000000 },
-    { name: 'Rolly', wind_speed: 165, rainfall: 180, duration: 24, casualties: 25, damage_cost: 2000000000 }
-  ]
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
+  }
 
-  const performClustering = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     setLoading(true)
     setError('')
-    
+    setResult(null)
+
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/cluster', {
+      const payload = {
+        families: parseFloat(formData.families) || 0,
+        persons: parseFloat(formData.persons) || 0,
+        barangays: parseFloat(formData.barangays) || 0,
+        dead: parseFloat(formData.dead) || 0,
+        injured_ill: parseFloat(formData.injured_ill) || 0,
+        missing: parseFloat(formData.missing) || 0,
+        totally_damaged: parseFloat(formData.totally_damaged) || 0,
+        partially_damaged: parseFloat(formData.partially_damaged) || 0,
+        cost: parseFloat(formData.cost) || 0,
+        duration_hrs: parseFloat(formData.duration_hrs) || 0,
+        max_sustained_wind: parseFloat(formData.max_sustained_wind) || 0,
+        typhoon_type: parseInt(formData.typhoon_type),
+        max_24hr_rainfall: parseFloat(formData.max_24hr_rainfall) || 0,
+        total_storm_rainfall: parseFloat(formData.total_storm_rainfall) || 0,
+        min_pressure: parseFloat(formData.min_pressure) || 0,
+        region: parseInt(formData.region),
+      }
+
+      const response = await fetch('http://127.0.0.1:8000/cluster', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ typhoon_data: sampleTyphoons })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to perform clustering')
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to get clustering result')
       }
 
-      const result: ClusterResult = await response.json()
-      setClusterData(result)
+      const data: ClusteringResult = await response.json()
+      setResult(data)
     } catch (err) {
-      setError('Failed to perform clustering. Please check if the backend server is running.')
-      console.error('Clustering error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to connect to the server.')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    performClustering()
-  }, [])
-
-  const getClusterColor = (clusterId: number) => {
-    const colors = [
-      'bg-blue-100 text-blue-800',
-      'bg-green-100 text-green-800', 
-      'bg-yellow-100 text-yellow-800',
-      'bg-red-100 text-red-800',
-      'bg-purple-100 text-purple-800'
-    ]
-    return colors[clusterId % colors.length]
+  const handleReset = () => {
+    setFormData(initialFormData)
+    setResult(null)
+    setError('')
   }
 
-  const getClusterName = (clusterId: number) => {
-    const names = ['Severe Impact', 'Moderate Impact', 'High Rainfall', 'Extended Duration', 'Minor Impact']
-    return names[clusterId % names.length]
+  const getLevelColor = (level: number) => {
+    switch (level) {
+      case 1: return 'bg-red-500'
+      case 2: return 'bg-yellow-500'
+      case 3: return 'bg-green-500'
+      default: return 'bg-gray-500'
+    }
+  }
+
+  const getLevelBgColor = (level: number) => {
+    switch (level) {
+      case 1: return 'bg-red-50 border-red-200'
+      case 2: return 'bg-yellow-50 border-yellow-200'
+      case 3: return 'bg-green-50 border-green-200'
+      default: return 'bg-gray-50 border-gray-200'
+    }
   }
 
   return (
-    <div className="min-h-screen py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Typhoon Cluster Analysis</h1>
-          <p className="text-lg text-gray-600">
-            K-Prototypes clustering of historical typhoon data to identify impact patterns
+    <div className="min-h-screen py-12 bg-gray-50">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-10">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Clustering Level Prediction</h1>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Enter typhoon impact data to classify the event into Level 1, 2, or 3
           </p>
         </div>
 
-        {error && (
-          <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-700">{error}</p>
-            <button 
-              onClick={performClustering}
-              className="mt-2 btn-primary"
-            >
-              Retry Clustering
-            </button>
-          </div>
-        )}
-
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Performing cluster analysis...</p>
-          </div>
-        ) : clusterData ? (
-          <div className="space-y-8">
-            {/* Cluster Summary */}
-            <div className="card">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-6">Cluster Summary</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-primary-600 mb-2">
-                    {clusterData.cluster_centers.length}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Input Features</h2>
+              
+              <div className="mb-8">
+                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Impact Metrics</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Families Affected</label>
+                    <input type="number" name="families" value={formData.families} onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0" />
                   </div>
-                  <p className="text-gray-600">Clusters Identified</p>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-secondary-600 mb-2">
-                    {sampleTyphoons.length}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Persons Affected</label>
+                    <input type="number" name="persons" value={formData.persons} onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0" />
                   </div>
-                  <p className="text-gray-600">Typhoons Analyzed</p>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-yellow-600 mb-2">
-                    {(clusterData.silhouette_score * 100).toFixed(1)}%
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Barangays Affected</label>
+                    <input type="number" name="barangays" value={formData.barangays} onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0" />
                   </div>
-                  <p className="text-gray-600">Clustering Quality</p>
                 </div>
               </div>
-            </div>
 
-            {/* Cluster Centers */}
-            <div className="card">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-6">Cluster Characteristics</h2>
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                {clusterData.cluster_centers.map((center, index) => (
-                  <div key={index} className="bg-gray-50 p-6 rounded-lg">
-                    <div className="flex items-center mb-4">
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${getClusterColor(index)}`}>
-                        Cluster {index + 1}
-                      </span>
-                      <span className="ml-2 text-sm text-gray-600">{getClusterName(index)}</span>
+              <div className="mb-8">
+                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Casualty Metrics</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Dead</label>
+                    <input type="number" name="dead" value={formData.dead} onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Injured/Ill</label>
+                    <input type="number" name="injured_ill" value={formData.injured_ill} onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Missing</label>
+                    <input type="number" name="missing" value={formData.missing} onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-8">
+                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Damage Metrics</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Totally Damaged Houses</label>
+                    <input type="number" name="totally_damaged" value={formData.totally_damaged} onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Partially Damaged Houses</label>
+                    <input type="number" name="partially_damaged" value={formData.partially_damaged} onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cost (PHP)</label>
+                    <input type="number" name="cost" value={formData.cost} onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-8">
+                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Weather Metrics</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Duration (hrs)</label>
+                    <input type="number" name="duration_hrs" value={formData.duration_hrs} onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Max Sustained Wind (kph)</label>
+                    <input type="number" name="max_sustained_wind" value={formData.max_sustained_wind} onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Typhoon Type</label>
+                    <select name="typhoon_type" value={formData.typhoon_type} onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                      {typhoonTypes.map(type => (
+                        <option key={type.value} value={type.value}>{type.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Max 24hr Rainfall (mm)</label>
+                    <input type="number" name="max_24hr_rainfall" value={formData.max_24hr_rainfall} onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Storm Rainfall (mm)</label>
+                    <input type="number" name="total_storm_rainfall" value={formData.total_storm_rainfall} onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Min Pressure (hPa)</label>
+                    <input type="number" name="min_pressure" value={formData.min_pressure} onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-8">
+                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Location</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Region Affected</label>
+                    <select name="region" value={formData.region} onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                      {regions.map(region => (
+                        <option key={region.value} value={region.value}>{region.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <button type="submit" disabled={loading}
+                  className="flex-1 px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-blue-300">
+                  {loading ? 'Processing...' : 'Predict Cluster Level'}
+                </button>
+                <button type="button" onClick={handleReset}
+                  className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300">
+                  Reset
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sticky top-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Clustering Result</h2>
+              
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
+                  <p className="text-red-700 text-sm">{error}</p>
+                </div>
+              )}
+
+              {result ? (
+                <div className="space-y-6">
+                  <div className={`p-6 rounded-xl border-2 ${getLevelBgColor(result.level)}`}>
+                    <div className="text-center">
+                      <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full ${getLevelColor(result.level)} text-white text-3xl font-bold mb-4`}>
+                        {result.level}
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900">{result.severity_label}</h3>
+                      <p className="text-sm text-gray-600 mt-2">Cluster {result.cluster}</p>
                     </div>
-                    
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Wind Speed:</span>
-                        <span className="text-sm font-medium">{center.wind_speed.toFixed(1)} km/h</span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 uppercase mb-2">Description</h4>
+                    <p className="text-gray-700 text-sm">{result.description}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 uppercase mb-2">Severity Score</h4>
+                    <div className="flex items-center">
+                      <div className="flex-1 bg-gray-200 rounded-full h-3">
+                        <div className={`h-3 rounded-full ${getLevelColor(result.level)}`}
+                          style={{ width: `${Math.min(result.severity_score / 100, 100)}%` }}></div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Rainfall:</span>
-                        <span className="text-sm font-medium">{center.rainfall.toFixed(1)} mm</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Duration:</span>
-                        <span className="text-sm font-medium">{center.duration.toFixed(1)} hours</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Avg Casualties:</span>
-                        <span className="text-sm font-medium">{center.casualties.toFixed(0)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Avg Damage:</span>
-                        <span className="text-sm font-medium">₱{(center.damage_cost / 1000000).toFixed(1)}M</span>
-                      </div>
+                      <span className="ml-3 text-sm font-medium">{result.severity_score.toFixed(2)}</span>
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">Enter data and click Predict to see results</p>
+                </div>
+              )}
             </div>
 
-            {/* Typhoon Classifications */}
-            <div className="card">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-6">Typhoon Classifications</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full table-auto">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Typhoon</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Cluster</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Wind Speed</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Rainfall</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Duration</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Casualties</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Damage Cost</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {sampleTyphoons.map((typhoon, index) => {
-                      const clusterId = clusterData.cluster_assignments[index]
-                      return (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{typhoon.name}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getClusterColor(clusterId)}`}>
-                              {clusterId + 1}: {getClusterName(clusterId)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{typhoon.wind_speed} km/h</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{typhoon.rainfall} mm</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{typhoon.duration} hours</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{typhoon.casualties.toLocaleString()}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">₱{(typhoon.damage_cost / 1000000000).toFixed(1)}B</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Insights */}
-            <div className="card bg-blue-50">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Key Insights</h2>
-              <div className="space-y-3 text-sm">
-                <p className="text-gray-700">
-                  • The clustering algorithm identified <strong>{clusterData.cluster_centers.length} distinct patterns</strong> in typhoon impact profiles
-                </p>
-                <p className="text-gray-700">
-                  • Clustering quality score of <strong>{(clusterData.silhouette_score * 100).toFixed(1)}%</strong> indicates well-separated clusters
-                </p>
-                <p className="text-gray-700">
-                  • Super typhoons like <strong>Yolanda</strong> and <strong>Pablo</strong> form distinct high-impact clusters
-                </p>
-                <p className="text-gray-700">
-                  • Rainfall-dominant events like <strong>Ondoy</strong> cluster separately from wind-dominant storms
-                </p>
+            <div className="bg-blue-50 rounded-2xl p-6 mt-6 border border-blue-100">
+              <h3 className="font-semibold text-blue-900 mb-3">MAACLI Framework</h3>
+              <p className="text-blue-800 text-sm mb-4">Clustering interpretability levels:</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center">
+                  <span className="w-3 h-3 rounded-full bg-red-500 mr-2"></span>
+                  <span>Level 1: High-Impact</span>
+                </div>
+                <div className="flex items-center">
+                  <span className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></span>
+                  <span>Level 2: Moderate-Impact</span>
+                </div>
+                <div className="flex items-center">
+                  <span className="w-3 h-3 rounded-full bg-green-500 mr-2"></span>
+                  <span>Level 3: Low-Impact</span>
+                </div>
               </div>
             </div>
           </div>
-        ) : null}
+        </div>
       </div>
     </div>
   )
