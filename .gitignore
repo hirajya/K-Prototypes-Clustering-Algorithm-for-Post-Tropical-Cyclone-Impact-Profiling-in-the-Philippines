@@ -3,9 +3,48 @@
 # ======================
 backend/venv/
 __pycache__/
+*/__pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.env/
+.venv/
+
+# Jupyter Notebook caches
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Python egg files
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+
+# Pytest cache
+.pytest_cache/
+.cache/
+
+# MyPy cache
+.mypy_cache/
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
 
 # ======================
 # Node / React
@@ -13,9 +52,19 @@ __pycache__/
 frontend/node_modules/
 frontend/build/
 frontend/.env
+frontend/.next/
+frontend/out/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Next.js cache
+.next/
+**/.next/
+.next/cache/
+.next/server/
+.next/static/
+out/
 
 # from frontend/.gitignore
 /node_modules
@@ -28,6 +77,12 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Node cache
+node_modules/
+.npm/
+.yarn/
+.pnp.*
 
 # ======================
 # IDE / Editors
