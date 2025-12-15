@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 
 interface ForecastResult {
   families: number
@@ -17,7 +17,6 @@ interface ForecastResult {
 
 interface FormData {
   max_sustained_wind: string
-  typhoon_type: string
   max_24hr_rainfall: string
   total_storm_rainfall: string
   min_pressure: string
@@ -26,26 +25,38 @@ interface FormData {
 
 const initialFormData: FormData = {
   max_sustained_wind: '',
-  typhoon_type: '0',
   max_24hr_rainfall: '',
   total_storm_rainfall: '',
   min_pressure: '',
   duration: '',
 }
 
-const typhoonTypes = [
-  { value: '0', label: 'TS - Tropical Storm' },
-  { value: '1', label: 'TD - Tropical Depression' },
-  { value: '2', label: 'STS - Severe Tropical Storm' },
-  { value: '3', label: 'TY - Typhoon' },
-  { value: '4', label: 'STY - Super Typhoon' },
-]
+// Auto-classify typhoon type based on max sustained wind
+const getTyphoonType = (maxSustainedWind: number): { type: number; label: string } => {
+  if (maxSustainedWind > 184) {
+    return { type: 4, label: 'STY - Super Typhoon' }
+  } else if (maxSustainedWind >= 118) {
+    return { type: 3, label: 'TY - Typhoon' }
+  } else if (maxSustainedWind >= 89) {
+    return { type: 2, label: 'STS - Severe Tropical Storm' }
+  } else if (maxSustainedWind >= 62) {
+    return { type: 0, label: 'TS - Tropical Storm' }
+  } else {
+    return { type: 1, label: 'TD - Tropical Depression' }
+  }
+}
 
 export default function PredictionPage() {
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [result, setResult] = useState<ForecastResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Auto-detect typhoon type based on max sustained wind
+  const typhoonClassification = useMemo(() => {
+    const wind = parseFloat(formData.max_sustained_wind) || 0
+    return getTyphoonType(wind)
+  }, [formData.max_sustained_wind])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -61,7 +72,7 @@ export default function PredictionPage() {
     try {
       const payload = {
         max_sustained_wind: parseFloat(formData.max_sustained_wind) || 0,
-        typhoon_type: parseInt(formData.typhoon_type),
+        typhoon_type: typhoonClassification.type,
         max_24hr_rainfall: parseFloat(formData.max_24hr_rainfall) || 0,
         total_storm_rainfall: parseFloat(formData.total_storm_rainfall) || 0,
         min_pressure: parseFloat(formData.min_pressure) || 0,
@@ -143,18 +154,11 @@ export default function PredictionPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Typhoon Type (Optional)</label>
-                  <select
-                    name="typhoon_type"
-                    value={formData.typhoon_type}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                  >
-                    {typhoonTypes.map(type => (
-                      <option key={type.value} value={type.value}>{type.label}</option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">May be removed for Linear Regression model</p>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Typhoon Classification</label>
+                  <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
+                    {typhoonClassification.label}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Auto-detected based on max sustained wind</p>
                 </div>
 
                 <div>
@@ -223,6 +227,19 @@ export default function PredictionPage() {
                 </button>
               </div>
             </form>
+
+            {/* Typhoon Classification Info */}
+            <div className="bg-gray-50 rounded-2xl p-6 mt-6 border border-gray-200">
+              <h3 className="font-semibold text-gray-900 mb-3">Typhoon Classification</h3>
+              <p className="text-gray-600 text-sm mb-4">Auto-detected based on max sustained wind:</p>
+              <div className="space-y-2 text-xs text-gray-600">
+                <div>TD - Tropical Depression: ≤61 km/h</div>
+                <div>TS - Tropical Storm: 62-88 km/h</div>
+                <div>STS - Severe Tropical Storm: 89-117 km/h</div>
+                <div>TY - Typhoon: 118-184 km/h</div>
+                <div>STY - Super Typhoon: &gt;184 km/h</div>
+              </div>
+            </div>
           </div>
 
           {/* Results */}

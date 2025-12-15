@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 
 interface ClusteringResult {
   cluster: number
@@ -22,7 +22,6 @@ interface FormData {
   cost: string
   duration_hrs: string
   max_sustained_wind: string
-  typhoon_type: string
   max_24hr_rainfall: string
   total_storm_rainfall: string
   min_pressure: string
@@ -41,31 +40,64 @@ const initialFormData: FormData = {
   cost: '',
   duration_hrs: '',
   max_sustained_wind: '',
-  typhoon_type: '0',
   max_24hr_rainfall: '',
   total_storm_rainfall: '',
   min_pressure: '',
-  region: '1',
+  region: '2',
 }
 
-const typhoonTypes = [
-  { value: '0', label: 'TS - Tropical Storm' },
-  { value: '1', label: 'TD - Tropical Depression' },
-  { value: '2', label: 'STS - Severe Tropical Storm' },
-  { value: '3', label: 'TY - Typhoon' },
-  { value: '4', label: 'STY - Super Typhoon' },
-]
+// Auto-classify typhoon type based on max sustained wind
+const getTyphoonType = (maxSustainedWind: number): { type: number; label: string } => {
+  if (maxSustainedWind > 184) {
+    return { type: 4, label: 'STY - Super Typhoon' }
+  } else if (maxSustainedWind >= 118) {
+    return { type: 3, label: 'TY - Typhoon' }
+  } else if (maxSustainedWind >= 89) {
+    return { type: 2, label: 'STS - Severe Tropical Storm' }
+  } else if (maxSustainedWind >= 62) {
+    return { type: 0, label: 'TS - Tropical Storm' }
+  } else {
+    return { type: 1, label: 'TD - Tropical Depression' }
+  }
+}
 
-const regions = Array.from({ length: 17 }, (_, i) => ({
-  value: String(i + 1),
-  label: `Region ${i + 1}`,
-}))
+// Map cluster to level: cluster 0 → Level 3 (High), cluster 1 → Level 2 (Moderate), cluster 2 → Level 1 (Low)
+const getDisplayLevel = (cluster: number): number => {
+  switch (cluster) {
+    case 0: return 3 // High Impact
+    case 1: return 2 // Moderate Impact
+    case 2: return 1 // Low Impact
+    default: return 1
+  }
+}
+
+const getSeverityLabel = (level: number): string => {
+  switch (level) {
+    case 3: return 'High-Impact'
+    case 2: return 'Moderate-Impact'
+    case 1: return 'Low-Impact'
+    default: return 'Unknown'
+  }
+}
+
+const regions = [
+  { value: '2', label: 'Region 2' },
+  { value: '3', label: 'Region 3' },
+  { value: '5', label: 'Region 5' },
+  { value: '8', label: 'Region 8' },
+]
 
 export default function ClusterPage() {
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [result, setResult] = useState<ClusteringResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Auto-detect typhoon type based on max sustained wind
+  const typhoonClassification = useMemo(() => {
+    const wind = parseFloat(formData.max_sustained_wind) || 0
+    return getTyphoonType(wind)
+  }, [formData.max_sustained_wind])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -91,7 +123,7 @@ export default function ClusterPage() {
         cost: parseFloat(formData.cost) || 0,
         duration_hrs: parseFloat(formData.duration_hrs) || 0,
         max_sustained_wind: parseFloat(formData.max_sustained_wind) || 0,
-        typhoon_type: parseInt(formData.typhoon_type),
+        typhoon_type: typhoonClassification.type,
         max_24hr_rainfall: parseFloat(formData.max_24hr_rainfall) || 0,
         total_storm_rainfall: parseFloat(formData.total_storm_rainfall) || 0,
         min_pressure: parseFloat(formData.min_pressure) || 0,
@@ -109,8 +141,17 @@ export default function ClusterPage() {
         throw new Error(errorData.detail || 'Failed to get clustering result')
       }
 
-      const data: ClusteringResult = await response.json()
-      setResult(data)
+      const data = await response.json()
+      
+      // Map the cluster to the correct display level
+      const displayLevel = getDisplayLevel(data.cluster)
+      const mappedResult: ClusteringResult = {
+        ...data,
+        level: displayLevel,
+        severity_label: getSeverityLabel(displayLevel),
+      }
+      
+      setResult(mappedResult)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect to the server.')
     } finally {
@@ -126,18 +167,18 @@ export default function ClusterPage() {
 
   const getLevelColor = (level: number) => {
     switch (level) {
-      case 1: return 'bg-red-500'
+      case 3: return 'bg-red-500'
       case 2: return 'bg-yellow-500'
-      case 3: return 'bg-green-500'
+      case 1: return 'bg-green-500'
       default: return 'bg-gray-500'
     }
   }
 
   const getLevelBgColor = (level: number) => {
     switch (level) {
-      case 1: return 'bg-red-50 border-red-200'
+      case 3: return 'bg-red-50 border-red-200'
       case 2: return 'bg-yellow-50 border-yellow-200'
-      case 3: return 'bg-green-50 border-green-200'
+      case 1: return 'bg-green-50 border-green-200'
       default: return 'bg-gray-50 border-gray-200'
     }
   }
@@ -234,13 +275,10 @@ export default function ClusterPage() {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Typhoon Type</label>
-                    <select name="typhoon_type" value={formData.typhoon_type} onChange={handleInputChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                      {typhoonTypes.map(type => (
-                        <option key={type.value} value={type.value}>{type.label}</option>
-                      ))}
-                    </select>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Typhoon Classification</label>
+                    <div className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
+                      {typhoonClassification.label}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Max 24hr Rainfall (mm)</label>
@@ -337,7 +375,7 @@ export default function ClusterPage() {
               <div className="space-y-2 text-sm">
                 <div className="flex items-center">
                   <span className="w-3 h-3 rounded-full bg-red-500 mr-2"></span>
-                  <span>Level 1: High-Impact</span>
+                  <span>Level 3: High-Impact</span>
                 </div>
                 <div className="flex items-center">
                   <span className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></span>
@@ -345,8 +383,20 @@ export default function ClusterPage() {
                 </div>
                 <div className="flex items-center">
                   <span className="w-3 h-3 rounded-full bg-green-500 mr-2"></span>
-                  <span>Level 3: Low-Impact</span>
+                  <span>Level 1: Low-Impact</span>
                 </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-2xl p-6 mt-6 border border-gray-200">
+              <h3 className="font-semibold text-gray-900 mb-3">Typhoon Classification</h3>
+              <p className="text-gray-600 text-sm mb-4">Auto-detected based on max sustained wind:</p>
+              <div className="space-y-2 text-xs text-gray-600">
+                <div>TD - Tropical Depression: ≤61 km/h</div>
+                <div>TS - Tropical Storm: 62-88 km/h</div>
+                <div>STS - Severe Tropical Storm: 89-117 km/h</div>
+                <div>TY - Typhoon: 118-184 km/h</div>
+                <div>STY - Super Typhoon: &gt;184 km/h</div>
               </div>
             </div>
           </div>
