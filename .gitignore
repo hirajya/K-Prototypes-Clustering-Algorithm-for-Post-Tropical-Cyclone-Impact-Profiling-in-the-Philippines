@@ -17,9 +17,6 @@ env/
 .env/
 .venv/
 
-# UV package manager
-# uv.lock should be committed for reproducible builds
-
 # Jupyter Notebook caches
 .ipynb_checkpoints/
 **/.ipynb_checkpoints/
