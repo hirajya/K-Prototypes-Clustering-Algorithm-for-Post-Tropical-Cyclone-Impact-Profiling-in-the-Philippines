@@ -1,4 +1,4 @@
 {
-  "/page": "app/page.js",
-  "/cluster/page": "app/cluster/page.js"
+  "/cluster/page": "app/cluster/page.js",
+  "/prediction/page": "app/prediction/page.js"
 }

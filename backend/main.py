@@ -50,9 +50,6 @@ class ClusteringInput(BaseModel):
 class ClusteringResponse(BaseModel):
     """Response from clustering prediction"""
     cluster: int
-    level: int
-    severity_label: str
-    severity_score: float
     description: str
 
 
@@ -94,8 +91,6 @@ class HealthResponse(BaseModel):
 models = {
     'clustering': None,
     'scaler': None,
-    'severity_classifications': None,
-    'level_mapping': None,
     'feature_columns': None,
     'prediction': None
 }
@@ -108,8 +103,6 @@ def load_clustering_models():
     try:
         models['clustering'] = joblib.load(os.path.join(clustering_dir, 'clustering_model.joblib'))
         models['scaler'] = joblib.load(os.path.join(clustering_dir, 'scaler.joblib'))
-        models['severity_classifications'] = joblib.load(os.path.join(clustering_dir, 'severity_classifications.joblib'))
-        models['level_mapping'] = joblib.load(os.path.join(clustering_dir, 'level_mapping.joblib'))
         models['feature_columns'] = joblib.load(os.path.join(clustering_dir, 'feature_columns.joblib'))
         print("✓ Clustering models loaded successfully")
         return True
@@ -181,7 +174,7 @@ async def health_check():
 @app.post("/cluster", response_model=ClusteringResponse, tags=["Clustering"])
 async def predict_cluster(input_data: ClusteringInput):
     """
-    Predict the cluster level (1, 2, or 3) for typhoon impact data.
+    Predict the cluster assignment for typhoon impact data.
     
     Typhoon Type Encoding:
     - TS (Tropical Storm) = 0
@@ -242,23 +235,16 @@ async def predict_cluster(input_data: ClusteringInput):
         # Predict cluster
         cluster = int(models['clustering'].predict(scaled_features)[0])
         
-        # Get severity info
-        severity_info = models['severity_classifications'].get(cluster, {})
-        level = models['level_mapping'].get(cluster, cluster + 1)
-        
-        # Generate description based on level
+        # Generate description
         descriptions = {
-            1: "High-Impact: Severe typhoon with significant casualties, extensive property damage, and large affected populations.",
-            2: "Moderate-Impact: Moderate severity event with noticeable damage concentrated in specific regions.",
-            3: "Low-Impact: Lower severity event with minimal casualties and limited property damage."
+            0: "Cluster 0: Typhoon impact pattern identified by the clustering algorithm.",
+            1: "Cluster 1: Typhoon impact pattern identified by the clustering algorithm.",
+            2: "Cluster 2: Typhoon impact pattern identified by the clustering algorithm."
         }
         
         return ClusteringResponse(
             cluster=cluster,
-            level=level,
-            severity_label=severity_info.get('label', f'Level {level}'),
-            severity_score=severity_info.get('severity_score', 0.0),
-            description=descriptions.get(level, "Impact level determined by clustering analysis.")
+            description=descriptions.get(cluster, f"Cluster {cluster}: Impact pattern determined by clustering analysis.")
         )
     
     except Exception as e:
@@ -321,25 +307,17 @@ async def predict_damage(input_data: ForecastInput):
 @app.get("/api/maacli", tags=["MAACLI"])
 async def get_maacli_insights():
     """Get MAACLI framework insights about the clustering model"""
-    if models['severity_classifications'] is None:
+    if models['clustering'] is None:
         raise HTTPException(
             status_code=503,
             detail="MAACLI insights not available. Please run the notebook first."
         )
     
     insights = {
-        "clusters": [],
-        "level_mapping": models['level_mapping'],
-        "feature_count": len(models['feature_columns']) if models['feature_columns'] else 0
+        "n_clusters": 3,
+        "feature_count": len(models['feature_columns']) if models['feature_columns'] else 0,
+        "features": models['feature_columns'] if models['feature_columns'] else []
     }
-    
-    for cluster_id, info in models['severity_classifications'].items():
-        insights["clusters"].append({
-            "cluster_id": cluster_id,
-            "label": info['label'],
-            "severity_score": info['severity_score'],
-            "rank": info['rank']
-        })
     
     return insights
 

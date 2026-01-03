@@ -4,9 +4,6 @@ import { useState, useMemo } from 'react'
 
 interface ClusteringResult {
   cluster: number
-  level: number
-  severity_label: string
-  severity_score: number
   description: string
 }
 
@@ -58,25 +55,6 @@ const getTyphoonType = (maxSustainedWind: number): { type: number; label: string
     return { type: 0, label: 'TS - Tropical Storm' }
   } else {
     return { type: 1, label: 'TD - Tropical Depression' }
-  }
-}
-
-// Map cluster to level: cluster 0 → Level 3 (High), cluster 1 → Level 2 (Moderate), cluster 2 → Level 1 (Low)
-const getDisplayLevel = (cluster: number): number => {
-  switch (cluster) {
-    case 0: return 3 // High Impact
-    case 1: return 2 // Moderate Impact
-    case 2: return 1 // Low Impact
-    default: return 1
-  }
-}
-
-const getSeverityLabel = (level: number): string => {
-  switch (level) {
-    case 3: return 'High-Impact'
-    case 2: return 'Moderate-Impact'
-    case 1: return 'Low-Impact'
-    default: return 'Unknown'
   }
 }
 
@@ -142,16 +120,7 @@ export default function ClusterPage() {
       }
 
       const data = await response.json()
-      
-      // Map the cluster to the correct display level
-      const displayLevel = getDisplayLevel(data.cluster)
-      const mappedResult: ClusteringResult = {
-        ...data,
-        level: displayLevel,
-        severity_label: getSeverityLabel(displayLevel),
-      }
-      
-      setResult(mappedResult)
+      setResult(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect to the server.')
     } finally {
@@ -165,21 +134,30 @@ export default function ClusterPage() {
     setError('')
   }
 
-  const getLevelColor = (level: number) => {
-    switch (level) {
-      case 3: return 'bg-red-500'
-      case 2: return 'bg-yellow-500'
-      case 1: return 'bg-green-500'
+  const getClusterColor = (cluster: number) => {
+    switch (cluster) {
+      case 0: return 'bg-red-500'  // High Impact
+      case 1: return 'bg-orange-500'  // Moderate Impact
+      case 2: return 'bg-green-500'  // Low Impact
       default: return 'bg-gray-500'
     }
   }
 
-  const getLevelBgColor = (level: number) => {
-    switch (level) {
-      case 3: return 'bg-red-50 border-red-200'
-      case 2: return 'bg-yellow-50 border-yellow-200'
-      case 1: return 'bg-green-50 border-green-200'
+  const getClusterBgColor = (cluster: number) => {
+    switch (cluster) {
+      case 0: return 'bg-red-50 border-red-200'  // High Impact
+      case 1: return 'bg-orange-50 border-orange-200'  // Moderate Impact
+      case 2: return 'bg-green-50 border-green-200'  // Low Impact
       default: return 'bg-gray-50 border-gray-200'
+    }
+  }
+
+  const getClusterLabel = (cluster: number) => {
+    switch (cluster) {
+      case 0: return 'High Impact'
+      case 1: return 'Moderate Impact'
+      case 2: return 'Low Impact'
+      default: return 'Unknown'
     }
   }
 
@@ -187,9 +165,9 @@ export default function ClusterPage() {
     <div className="min-h-screen py-12 bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Clustering Level Prediction</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Clustering Analysis</h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Enter typhoon impact data to classify the event into Level 1, 2, or 3
+            Enter typhoon impact data to identify the cluster pattern
           </p>
         </div>
 
@@ -316,7 +294,7 @@ export default function ClusterPage() {
               <div className="flex gap-4">
                 <button type="submit" disabled={loading}
                   className="flex-1 px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-blue-300">
-                  {loading ? 'Processing...' : 'Predict Cluster Level'}
+                  {loading ? 'Processing...' : 'Predict Cluster'}
                 </button>
                 <button type="button" onClick={handleReset}
                   className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300">
@@ -338,28 +316,18 @@ export default function ClusterPage() {
 
               {result ? (
                 <div className="space-y-6">
-                  <div className={`p-6 rounded-xl border-2 ${getLevelBgColor(result.level)}`}>
+                  <div className={`p-6 rounded-xl border-2 ${getClusterBgColor(result.cluster)}`}>
                     <div className="text-center">
-                      <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full ${getLevelColor(result.level)} text-white text-3xl font-bold mb-4`}>
-                        {result.level}
+                      <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full ${getClusterColor(result.cluster)} text-white text-3xl font-bold mb-4`}>
+                        {result.cluster}
                       </div>
-                      <h3 className="text-xl font-bold text-gray-900">{result.severity_label}</h3>
-                      <p className="text-sm text-gray-600 mt-2">Cluster {result.cluster}</p>
+                      <h3 className="text-xl font-bold text-gray-900">Cluster {result.cluster}</h3>
+                      <p className="text-gray-700 text-sm">{getClusterLabel(result.cluster)}</p>
                     </div>
                   </div>
                   <div>
                     <h4 className="text-sm font-medium text-gray-500 uppercase mb-2">Description</h4>
                     <p className="text-gray-700 text-sm">{result.description}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-500 uppercase mb-2">Severity Score</h4>
-                    <div className="flex items-center">
-                      <div className="flex-1 bg-gray-200 rounded-full h-3">
-                        <div className={`h-3 rounded-full ${getLevelColor(result.level)}`}
-                          style={{ width: `${Math.min(result.severity_score / 100, 100)}%` }}></div>
-                      </div>
-                      <span className="ml-3 text-sm font-medium">{result.severity_score.toFixed(2)}</span>
-                    </div>
                   </div>
                 </div>
               ) : (
@@ -371,19 +339,19 @@ export default function ClusterPage() {
 
             <div className="bg-blue-50 rounded-2xl p-6 mt-6 border border-blue-100">
               <h3 className="font-semibold text-blue-900 mb-3">MAACLI Framework</h3>
-              <p className="text-blue-800 text-sm mb-4">Clustering interpretability levels:</p>
+              <p className="text-blue-800 text-sm mb-4">Clustering analysis using interpretable patterns:</p>
               <div className="space-y-2 text-sm">
                 <div className="flex items-center">
                   <span className="w-3 h-3 rounded-full bg-red-500 mr-2"></span>
-                  <span>Level 3: High-Impact</span>
+                  <span>Cluster 0 - High Impact</span>
                 </div>
                 <div className="flex items-center">
-                  <span className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></span>
-                  <span>Level 2: Moderate-Impact</span>
+                  <span className="w-3 h-3 rounded-full bg-orange-500 mr-2"></span>
+                  <span>Cluster 1 - Moderate Impact</span>
                 </div>
                 <div className="flex items-center">
                   <span className="w-3 h-3 rounded-full bg-green-500 mr-2"></span>
-                  <span>Level 1: Low-Impact</span>
+                  <span>Cluster 2 - Low Impact</span>
                 </div>
               </div>
             </div>
