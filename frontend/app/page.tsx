@@ -8,11 +8,11 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold mb-6">
-              Typhoon Impact Clustering & Prediction System
+            Clustering for Post-Tropical Cyclone Impact Profiling in the Philippines
             </h1>
             <p className="text-xl md:text-2xl mb-8 text-blue-100 max-w-3xl mx-auto">
-              A demonstration system for post-tropical cyclone impact profiling using 
-              machine learning models deployed with FastAPI
+              A demonstration system for post-tropical cyclone impact profiling and future damage prediction using 
+              machine learning models
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link 
