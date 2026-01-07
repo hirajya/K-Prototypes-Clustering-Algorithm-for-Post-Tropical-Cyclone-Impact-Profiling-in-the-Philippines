@@ -66,6 +66,10 @@ yarn-error.log*
 .next/static/
 out/
 
+# Next.js build artifacts
+*.pack
+*.tgz
+
 # from frontend/.gitignore
 /node_modules
 /.pnp
