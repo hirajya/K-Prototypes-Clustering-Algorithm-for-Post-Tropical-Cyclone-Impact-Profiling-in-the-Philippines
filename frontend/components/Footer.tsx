@@ -2,28 +2,28 @@ const Footer = () => {
   const authors = [
     {
       name: "Cailing, Michaela Angela",
-      linkedin: "https://linkedin.com/in/michaela-angela-cailing",
-      github: "https://github.com/michaelacailing"
+      linkedin: "https://www.linkedin.com/in/michaela-angela-e-cailing-a503332a2/",
+      github: "https://github.com/ellaangela"
     },
     {
       name: "De Luna, Mark Rhey Anthony",
-      linkedin: "https://linkedin.com/in/mark-rhey-anthony-de-luna",
-      github: "https://github.com/markrheyanthony"
+      linkedin: "https://www.linkedin.com/in/mark-rhey-anthony-de-luna-0893b6298/",
+      github: "https://github.com/RheyMartt"
     },
     {
       name: "Estrada, Rodney Lei",
-      linkedin: "https://linkedin.com/in/rodney-lei-estrada",
-      github: "https://github.com/rodneyestrada"
+      linkedin: "https://www.linkedin.com/in/rodneyleiestrada/",
+      github: "https://github.com/hirajya"
     },
     {
       name: "Racho, Charles",
-      linkedin: "https://linkedin.com/in/charles-racho",
-      github: "https://github.com/charlesracho"
+      linkedin: "https://www.linkedin.com/in/rachocr/",
+      github: "https://github.com/rachocr"
     },
     {
       name: "Tamayo, Danyssa",
-      linkedin: "https://linkedin.com/in/danyssa-tamayo",
-      github: "https://github.com/danyssatamayo"
+      linkedin: "#",
+      github: "https://github.com/tamayodb"
     }
   ];
 
@@ -59,9 +59,6 @@ const Footer = () => {
             <h3 className="text-lg font-semibold mb-4">CCIT</h3>
             <p className="text-gray-400 text-sm">
               College of Computing and Information Technologies
-            </p>
-            <p className="text-gray-400 text-sm mt-2">
-              Department of Computer Science
             </p>
           </div>
           

@@ -6,7 +6,7 @@ import Footer from '@/components/Footer'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  title: 'Clustering for Post-Tropical Cyclone Impact Profiling in the Philippines',
+  title: 'CPTCIP - Clustering for Post-Tropical Cyclone Impact Profiling',
   description: 'Clustering for Post-Tropical Cyclone Impact Profiling in the Philippines',
 }
 
