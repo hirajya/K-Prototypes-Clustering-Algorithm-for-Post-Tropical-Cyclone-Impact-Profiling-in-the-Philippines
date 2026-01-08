@@ -373,10 +373,10 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Level 1 */}
+            {/* Level 3 */}
             <div className="bg-red-50 rounded-xl p-6 border-l-4 border-red-500">
               <div className="flex items-center mb-4">
-                <span className="text-3xl font-bold text-red-600">Level 1</span>
+                <span className="text-3xl font-bold text-red-600">Level 3</span>
               </div>
               <h4 className="font-semibold text-gray-900 mb-2">
                 High-Impact Tropical Cyclones
@@ -404,11 +404,11 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Level 3 */}
+            {/* Level 1 */}
             <div className="bg-green-50 rounded-xl p-6 border-l-4 border-green-500">
               <div className="flex items-center mb-4">
                 <span className="text-3xl font-bold text-green-600">
-                  Level 3
+                  Level 1
                 </span>
               </div>
               <h4 className="font-semibold text-gray-900 mb-2">
