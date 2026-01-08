@@ -10,8 +10,8 @@ const Navbar = () => {
 
   const navItems = [
     { href: '/', label: 'Home' },
-    { href: '/cluster', label: 'Clustering Level' },
-    { href: '/prediction', label: 'Future Prediction' },
+    { href: '/cluster', label: 'Impact Profiling' },
+    { href: '/prediction', label: 'Future Damage Prediction' },
   ]
 
   return (
@@ -20,14 +20,9 @@ const Navbar = () => {
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link href="/" className="flex-shrink-0 flex items-center">
-              <div className="h-10 w-10 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-lg flex items-center justify-center shadow-md">
-                <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
               <div className="ml-3">
-                <span className="text-lg font-bold text-gray-900">Typhoon Impact</span>
-                <span className="hidden sm:inline text-sm text-gray-500 ml-1">Clustering System</span>
+                <span className="text-lg font-bold text-gray-900">Tropical Cyclones Impact</span>
+                <span className="hidden sm:inline text-sm text-gray-500 ml-1">Impact Profiling and Future Damage Prediction</span>
               </div>
             </Link>
           </div>
