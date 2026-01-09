@@ -79,7 +79,7 @@ export default function PredictionPage() {
         duration: parseFloat(formData.duration) || 0,
       }
 
-      const response = await fetch('http://127.0.0.1:8000/forecast', {
+      const response = await fetch('https://clustering-for-post-tropical-cyclone.onrender.com/forecast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
