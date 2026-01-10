@@ -62,20 +62,17 @@ class ForecastInput(BaseModel):
     min_pressure: float = Field(..., description="Minimum pressure in hPa")
     duration: float = Field(..., description="Duration in hours")
 
-
 class ForecastResponse(BaseModel):
-    """Response from damage prediction"""
+    """Response containing predictions for all impact categories"""
     families: float
     persons: float
     barangays: float
     dead: float
-    injured_ill: float
+    injured: float 
     missing: float
-    cost: float
-    partially_damaged: float
     totally_damaged: float
+    partially_damaged: float
     message: str
-
 
 class HealthResponse(BaseModel):
     """Health check response"""
@@ -94,10 +91,10 @@ prediction_targets = [
 
 # Global model storage
 models = {
-    'clustering': None,
+    'clustering': {},
     'scaler': None,
     'feature_columns': None,
-    'prediction': None
+    'prediction': {}
 }
 
 
@@ -123,7 +120,11 @@ def load_clustering_models():
 def load_prediction_models():
     """Load all prediction models dynamically"""
     base_path = os.path.join(os.path.dirname(__file__), '..', 'models', 'prediction')
+    print(base_path)
     
+    print(f"DEBUG: Looking for models in: {os.path.abspath(base_path)}")
+    
+
     loaded_count = 0
     for target in prediction_targets:
         try:
@@ -269,63 +270,78 @@ async def predict_cluster(input_data: ClusteringInput):
 @app.post("/predict", response_model=ForecastResponse, tags=["Prediction"])
 async def predict_damage(input_data: ForecastInput):
     """
-    Predict damages for all categories based on weather inputs.
-    Iterates through each trained model (Linear/XGB), scales input specifically for that model,
-    and aggregates results.
+    Debug version of predict_damage to catch and print 500 errors.
     """
-    if not models['prediction']:
+    print("\n🔹 RECEIVED PREDICTION REQUEST")
+    print(f"   Input: {input_data}")
+
+    # 1. Check if models are loaded
+    if not models.get('prediction'):
+        print("❌ ERROR: Prediction models dictionary is empty.")
         raise HTTPException(status_code=503, detail="Prediction models not loaded")
 
-    # 1. Map API Input to a dictionary
-    weather_data = {
-        'max_sustained_wind_kph': input_data.max_sustained_wind,
-        'max_24hr_rainfall_mm': input_data.max_24hr_rainfall,
-        'total_storm_rainfall_mm': input_data.total_storm_rainfall,
-        'min_pressure_hpa': input_data.min_pressure,
-    }
+    try:
+        # 2. Map API Input
+        weather_data = {
+            'max_sustained_wind_kph': input_data.max_sustained_wind,
+            'max_24hr_rainfall_mm': input_data.max_24hr_rainfall,
+            'total_storm_rainfall_mm': input_data.total_storm_rainfall,
+            'min_pressure_hpa': input_data.min_pressure,
+        }
+        
+        results = {}
 
-    results = {}
+        # 3. Prediction Loop
+        for target, assets in models['prediction'].items():
+            try:
+                model = assets['model']
+                scaler = assets['scaler']
+                required_features = assets['features']
 
-    # 2. Iterate through every target model available
-    for target, assets in models['prediction'].items():
-        try:
-            model = assets['model']
-            scaler = assets['scaler']
-            required_features = assets['features'] # e.g. ['max_sustained_wind_kph', ...]
+                # Create DataFrame
+                input_df = pd.DataFrame([weather_data])
+                
+                # Fill missing columns
+                for feature in required_features:
+                    if feature not in input_df.columns:
+                        input_df[feature] = 0.0 
+                
+                # Reorder to match training
+                input_df = input_df[required_features]
 
-            # 3. Create DataFrame for THIS specific model
-            input_df = pd.DataFrame([weather_data])
-            
-            # Validation: Ensure we have all features the model needs
-            for feature in required_features:
-                if feature not in input_df.columns:
-                    input_df[feature] = 0 # Default fallback
-            
-            # Reorder columns to match training exactly
-            input_df = input_df[required_features]
+                # Scale and Predict
+                scaled_input = scaler.transform(input_df)
+                prediction = model.predict(scaled_input)[0]
 
-            # 4. Scale and Predict
-            scaled_input = scaler.transform(input_df)
-            prediction = model.predict(scaled_input)[0]
+                # Save result (Force regular Python int)
+                results[target] = int(max(0, prediction))
 
-            # 5. Post-process (no negative damages)
-            results[target] = int(max(0, prediction))
+            except Exception as inner_e:
+                print(f"   ⚠️ Error predicting '{target}': {inner_e}")
+                results[target] = 0 # Default to 0 on error
 
-        except Exception as e:
-            print(f"Error predicting {target}: {e}")
-            results[target] = -1 # Indicate error for this specific field
+        # 4. Construct Response
+        response_payload = {
+            "families": results.get('families', 0),
+            "persons": results.get('person', 0),
+            "barangays": results.get('brgy', 0),
+            "dead": results.get('dead', 0),
+            "injured": results.get('injured', 0),
+            "missing": results.get('missing', 0),
+            "totally_damaged": results.get('totally', 0),
+            "partially_damaged": results.get('partially', 0),
+            "message": "Prediction successful"
+        }
+        
+        print("✅ PREDICTION SUCCESSFUL")
+        return response_payload
 
-    # 6. Map results to Response Model fields
-    return {
-        "families": results.get('families', 0),
-        "persons": results.get('person', 0), # Mapped 'person' -> 'persons'
-        "barangays": results.get('brgy', 0),
-        "dead": results.get('dead', 0),
-        "injured": results.get('injured', 0),
-        "missing": results.get('missing', 0),
-        "totally_damaged": results.get('totally', 0),
-        "partially_damaged": results.get('partially', 0)
-    }
+    except Exception as e:
+        # THIS PRINTS THE REAL ERROR TO YOUR TERMINAL
+        import traceback
+        print("❌ CRITICAL SERVER ERROR:")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @app.get("/api/maacli", tags=["MAACLI"])
 async def get_maacli_insights():
