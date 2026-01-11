@@ -249,7 +249,7 @@ export default function Home() {
                           clipRule="evenodd"
                         />
                       </svg>
-                      Offers a fast, data-driven framework for tropical cyclones
+                      Offers a data-driven framework for tropical cyclones
                       severity impact profiling using machine learning
                     </li>
                     <li className="flex items-start">
