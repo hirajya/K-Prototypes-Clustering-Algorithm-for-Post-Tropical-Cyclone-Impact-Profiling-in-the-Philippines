@@ -115,9 +115,11 @@ export default function ClusterPage() {
       }
     })
     
-    // Wind speed validation (required and minimum for tropical storm)
+    // Wind speed validation: must be provided and > 0, with domain bounds
     const wind = parseFloat(data.max_sustained_wind)
-    if (data.max_sustained_wind && wind > 0) {
+    if (!data.max_sustained_wind || isNaN(wind) || wind <= 0) {
+      errors.max_sustained_wind = 'Max Sustained Wind is required and must be ≥ 62 km/h'
+    } else {
       if (wind < 62) {
         errors.max_sustained_wind = 'Wind speed must be at least 62 km/h (Tropical Storm threshold)'
       } else if (wind > 300) {
@@ -202,7 +204,7 @@ export default function ClusterPage() {
         partially_damaged: parseFloat(formData.partially_damaged) || 0,
         cost: parseFloat(formData.cost) || 0,
         duration_hrs: parseFloat(formData.duration_hrs) || 0,
-        max_sustained_wind: parseFloat(formData.max_sustained_wind) || 0,
+        max_sustained_wind: parseFloat(formData.max_sustained_wind),
         typhoon_type: typhoonClassification.type,
         max_24hr_rainfall: parseFloat(formData.max_24hr_rainfall) || 0,
         total_storm_rainfall: parseFloat(formData.total_storm_rainfall) || 0,
@@ -362,7 +364,7 @@ export default function ClusterPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Max Sustained Wind (kph)</label>
                     <input type="number" name="max_sustained_wind" value={formData.max_sustained_wind} onChange={handleInputChange}
-                      min="0"
+                      min="62" required
                       className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                         validationErrors.max_sustained_wind ? 'border-red-500' : 'border-gray-300'
                       }`} placeholder="62 or higher" />
