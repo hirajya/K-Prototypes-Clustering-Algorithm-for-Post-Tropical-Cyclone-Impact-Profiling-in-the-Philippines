@@ -147,7 +147,42 @@ def load_prediction_models():
     print(f"✓ Prediction models loaded: {loaded_count}/{len(prediction_targets)} targets ready")
     return loaded_count > 0
 
+def get_weather_features(input_data: ForecastInput) -> Dict[str, float]:
+    return {
+        'max_sustained_wind_kph': input_data.max_sustained_wind,
+        'max_24hr_rainfall_mm': input_data.max_24hr_rainfall,
+        'total_storm_rainfall_mm': input_data.total_storm_rainfall,
+        'min_pressure_hpa': input_data.min_pressure,
+        'duration_in_PAR_hours': input_data.duration,
+    }
 
+def predict_target(target_name: str, assets: dict, weather_data: dict) -> int:
+    try:
+        model = assets['model']
+        scaler = assets['scaler']
+        required_features = assets['features']
+
+        # Create DataFrame from input dictionary
+        input_df = pd.DataFrame([weather_data])
+
+        # Fill missing columns with 0.0 (Safety check)
+        for feature in required_features:
+            if feature not in input_df.columns:
+                input_df[feature] = 0.0
+        
+        # Reorder columns to match training exactly
+        input_df = input_df[required_features]
+
+        # Scale and Predict
+        scaled_input = scaler.transform(input_df)
+        prediction = model.predict(scaled_input)[0]
+
+        return int(max(0, prediction))
+
+    except Exception as e:
+        print(f"   ⚠️ Error predicting '{target_name}': {e}")
+        return 0
+    
 # Load models at startup
 @app.on_event("startup")
 async def startup_event():
@@ -270,58 +305,23 @@ async def predict_cluster(input_data: ClusteringInput):
 @app.post("/predict", response_model=ForecastResponse, tags=["Prediction"])
 async def predict_damage(input_data: ForecastInput):
     """
-    Debug version of predict_damage to catch and print 500 errors.
+    Main Endpoint: Predicts ALL targets at once.
     """
-    print("\n🔹 RECEIVED PREDICTION REQUEST")
-    print(f"   Input: {input_data}")
-
-    # 1. Check if models are loaded
+    # 1. Validation
     if not models.get('prediction'):
-        print("❌ ERROR: Prediction models dictionary is empty.")
         raise HTTPException(status_code=503, detail="Prediction models not loaded")
 
     try:
-        # 2. Map API Input
-        weather_data = {
-            'max_sustained_wind_kph': input_data.max_sustained_wind,
-            'max_24hr_rainfall_mm': input_data.max_24hr_rainfall,
-            'total_storm_rainfall_mm': input_data.total_storm_rainfall,
-            'min_pressure_hpa': input_data.min_pressure,
-        }
+        # 2. Prepare Data
+        weather_features = get_weather_features(input_data)
         
+        # 3. Run Predictions Loop (Predicts all of it at once)
         results = {}
-
-        # 3. Prediction Loop
         for target, assets in models['prediction'].items():
-            try:
-                model = assets['model']
-                scaler = assets['scaler']
-                required_features = assets['features']
-
-                # Create DataFrame
-                input_df = pd.DataFrame([weather_data])
-                
-                # Fill missing columns
-                for feature in required_features:
-                    if feature not in input_df.columns:
-                        input_df[feature] = 0.0 
-                
-                # Reorder to match training
-                input_df = input_df[required_features]
-
-                # Scale and Predict
-                scaled_input = scaler.transform(input_df)
-                prediction = model.predict(scaled_input)[0]
-
-                # Save result (Force regular Python int)
-                results[target] = int(max(0, prediction))
-
-            except Exception as inner_e:
-                print(f"   ⚠️ Error predicting '{target}': {inner_e}")
-                results[target] = 0 # Default to 0 on error
+            results[target] = predict_target(target, assets, weather_features)
 
         # 4. Construct Response
-        response_payload = {
+        return {
             "families": results.get('families', 0),
             "persons": results.get('person', 0),
             "barangays": results.get('brgy', 0),
@@ -332,16 +332,10 @@ async def predict_damage(input_data: ForecastInput):
             "partially_damaged": results.get('partially', 0),
             "message": "Prediction successful"
         }
-        
-        print("✅ PREDICTION SUCCESSFUL")
-        return response_payload
 
     except Exception as e:
-        # THIS PRINTS THE REAL ERROR TO YOUR TERMINAL
-        import traceback
-        print("❌ CRITICAL SERVER ERROR:")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+        print(f"Server Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.get("/api/maacli", tags=["MAACLI"])
 async def get_maacli_insights():
