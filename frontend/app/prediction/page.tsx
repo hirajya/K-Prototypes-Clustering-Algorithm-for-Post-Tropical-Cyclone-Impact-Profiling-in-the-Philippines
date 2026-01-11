@@ -63,20 +63,55 @@ export default function PredictionPage() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
+  // Validation Logic
+  const validateForm = (data: FormData): string | null => {
+    const wind = parseFloat(data.max_sustained_wind)
+    const rain24 = parseFloat(data.max_24hr_rainfall)
+    const rainTotal = parseFloat(data.total_storm_rainfall)
+    const pressure = parseFloat(data.min_pressure)
+    const duration = parseFloat(data.duration)
+
+    // Check for Empty or Non-Numeric
+    if (isNaN(wind) || isNaN(rain24) || isNaN(rainTotal) || isNaN(pressure) || isNaN(duration)) {
+      return "Please fill in all fields with valid numbers."
+    }
+
+    if (wind <= 0) return "Max Sustained Wind must be greater than 0 kph."
+
+    if (rain24 <= 0) return "24hr Rainfall must be greater than 0 mm."
+    if (rainTotal <= 0) return "Total Storm Rainfall must be greater than 0 mm."
+    
+    if (rainTotal < rain24) return "Total Storm Rainfall cannot be less than Max 24hr Rainfall."
+
+    if (pressure <= 0) return "Min Pressure must be greater than 0 hPa."
+    if (pressure < 800 || pressure > 1050) return "Min Pressure is outside realistic range (800-1050 hPa)."
+
+    if (duration <= 0) return "Duration must be greater than 0 hours."
+
+    return null 
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
     setResult(null)
 
+    const validationError = validateForm(formData)
+    if (validationError) {
+      setError(validationError)
+      setLoading(false)
+      return 
+    }
+
     try {
       const payload = {
-        max_sustained_wind: parseFloat(formData.max_sustained_wind) || 0,
+        max_sustained_wind: parseFloat(formData.max_sustained_wind), 
         typhoon_type: typhoonClassification.type,
-        max_24hr_rainfall: parseFloat(formData.max_24hr_rainfall) || 0,
-        total_storm_rainfall: parseFloat(formData.total_storm_rainfall) || 0,
-        min_pressure: parseFloat(formData.min_pressure) || 0,
-        duration: parseFloat(formData.duration) || 0,
+        max_24hr_rainfall: parseFloat(formData.max_24hr_rainfall),
+        total_storm_rainfall: parseFloat(formData.total_storm_rainfall),
+        min_pressure: parseFloat(formData.min_pressure),
+        duration: parseFloat(formData.duration),
       }
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clustering-for-post-tropical-cyclone.onrender.com'
@@ -112,13 +147,13 @@ export default function PredictionPage() {
     <div className="min-h-screen py-12 bg-gray-50">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Future Prediction</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Future Damage Prediction</h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Predict damage severity and impact metrics based on weather features
           </p>
         </div>
 
-        {/* Coming Soon Banner */}
+        {/* Coming Soon Banner
         <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 mb-8">
           <div className="flex items-start">
             <div className="flex-shrink-0">
@@ -133,7 +168,7 @@ export default function PredictionPage() {
               </p>
             </div>
           </div>
-        </div>
+        </div> */}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Form */}
@@ -149,6 +184,8 @@ export default function PredictionPage() {
                     name="max_sustained_wind"
                     value={formData.max_sustained_wind}
                     onChange={handleInputChange}
+                    min="0"
+                    step="any"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
                     placeholder="e.g., 150"
                   />
@@ -169,6 +206,8 @@ export default function PredictionPage() {
                     name="max_24hr_rainfall"
                     value={formData.max_24hr_rainfall}
                     onChange={handleInputChange}
+                    min="0"
+                    step="any"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
                     placeholder="e.g., 200"
                   />
@@ -181,6 +220,8 @@ export default function PredictionPage() {
                     name="total_storm_rainfall"
                     value={formData.total_storm_rainfall}
                     onChange={handleInputChange}
+                    min="0"
+                    step="any"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
                     placeholder="e.g., 350"
                   />
@@ -193,6 +234,8 @@ export default function PredictionPage() {
                     name="min_pressure"
                     value={formData.min_pressure}
                     onChange={handleInputChange}
+                    min="0"
+                    step="any"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
                     placeholder="e.g., 950"
                   />
@@ -205,6 +248,8 @@ export default function PredictionPage() {
                     name="duration"
                     value={formData.duration}
                     onChange={handleInputChange}
+                    min="0"
+                    step="any"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
                     placeholder="e.g., 48"
                   />
