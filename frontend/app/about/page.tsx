@@ -1,3 +1,5 @@
+import Image from 'next/image'
+
 export default function AboutPage() {
   const teamMembers = [
     {
@@ -117,10 +119,12 @@ export default function AboutPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {teamMembers.map((member, index) => (
               <div key={index} className="card text-center">
-                <img 
+                <Image 
                   src={member.image} 
                   alt={member.name}
-                  className="w-32 h-32 rounded-full mx-auto mb-4 object-cover"
+                  width={128}
+                  height={128}
+                  className="rounded-full mx-auto mb-4 object-cover"
                 />
                 <h3 className="text-xl font-bold text-gray-900 mb-2">{member.name}</h3>
                 <p className="text-primary-600 font-medium mb-2">{member.role}</p>

@@ -108,7 +108,7 @@ export default function ClusterPage() {
         region: parseInt(formData.region),
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clustering-for-post-tropical-cyclone.onrender.com'
       const response = await fetch(`${apiUrl}/cluster`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
