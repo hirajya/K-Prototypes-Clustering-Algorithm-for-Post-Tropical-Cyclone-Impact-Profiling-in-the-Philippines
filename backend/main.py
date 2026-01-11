@@ -237,9 +237,9 @@ async def predict_cluster(input_data: ClusteringInput):
         
         # Generate description
         descriptions = {
-            0: "Level 3: Typhoon impact pattern identified by the clustering algorithm.",
-            1: "Level 2: Typhoon impact pattern identified by the clustering algorithm.",
-            2: "Level 1: Typhoon impact pattern identified by the clustering algorithm."
+            0: "Severe events with significant casualties, extensive property damage, and large affected populations requiring immediate response.",
+            1: "Moderate severity events with noticeable damage concentrated in specific regions requiring coordinated response.",
+            2: "Lower severity events with minimal casualties and limited property damage requiring standard response protocols."
         }
         
         return ClusteringResponse(

@@ -154,9 +154,9 @@ export default function ClusterPage() {
 
   const getClusterLabel = (cluster: number) => {
     switch (cluster) {
-      case 0: return 'Level 3 - High Impact'
-      case 1: return 'Level 2 - Moderate Impact'
-      case 2: return 'Level 1 - Low Impact'
+      case 0: return 'High Impact'
+      case 1: return 'Moderate Impact'
+      case 2: return 'Low Impact'
       default: return 'Unknown'
     }
   }
@@ -314,68 +314,70 @@ export default function ClusterPage() {
           </div>
 
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sticky top-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Clustering Result</h2>
-              
-              {error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
-                  <p className="text-red-700 text-sm">{error}</p>
-                </div>
-              )}
+            <div className="lg:sticky lg:top-6 space-y-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-6">Clustering Result</h2>
+                
+                {error && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
+                    <p className="text-red-700 text-sm">{error}</p>
+                  </div>
+                )}
 
-              {result ? (
-                <div className="space-y-6">
-                  <div className={`p-6 rounded-xl border-2 ${getClusterBgColor(result.cluster)}`}>
-                    <div className="text-center">
-                      <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full ${getClusterColor(result.cluster)} text-white text-3xl font-bold mb-4`}>
-                        {getClusterLevelNumber(result.cluster)}
+                {result ? (
+                  <div className="space-y-6">
+                    <div className={`p-6 rounded-xl border-2 ${getClusterBgColor(result.cluster)}`}>
+                      <div className="text-center">
+                        <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full ${getClusterColor(result.cluster)} text-white text-3xl font-bold mb-4`}>
+                          {getClusterLevelNumber(result.cluster)}
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900">
+                           {result.cluster === 0 ? 'Level 3' : result.cluster === 1 ? 'Level 2' : 'Level 1'}
+                        </h3>
+                        <p className="text-gray-700 text-sm">{getClusterLabel(result.cluster)}</p>
                       </div>
-                      <h3 className="text-xl font-bold text-gray-900">
-                         {result.cluster === 0 ? 'Level 3' : result.cluster === 1 ? 'Level 2' : 'Level 1'}
-                      </h3>
-                      <p className="text-gray-700 text-sm">{getClusterLabel(result.cluster)}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-500 uppercase mb-2">Description</h4>
+                      <p className="text-gray-700 text-sm">{result.description}</p>
                     </div>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-500 uppercase mb-2">Description</h4>
-                    <p className="text-gray-700 text-sm">{result.description}</p>
+                ) : (
+                  <div className="text-center py-12">
+                    <p className="text-gray-500">Enter data and click Predict to see results</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100">
+                <h3 className="font-semibold text-blue-900 mb-3">MAACLI Framework</h3>
+                <p className="text-blue-800 text-sm mb-4">Clustering analysis using interpretable patterns:</p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center">
+                    <span className="w-3 h-3 rounded-full bg-red-500 mr-2"></span>
+                    <span>Level 3 - High Impact</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="w-3 h-3 rounded-full bg-orange-500 mr-2"></span>
+                    <span>Level 2 - Moderate Impact</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="w-3 h-3 rounded-full bg-green-500 mr-2"></span>
+                    <span>Level 1 - Low Impact</span>
                   </div>
                 </div>
-              ) : (
-                <div className="text-center py-12">
-                  <p className="text-gray-500">Enter data and click Predict to see results</p>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-blue-50 rounded-2xl p-6 mt-6 border border-blue-100">
-              <h3 className="font-semibold text-blue-900 mb-3">MAACLI Framework</h3>
-              <p className="text-blue-800 text-sm mb-4">Clustering analysis using interpretable patterns:</p>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center">
-                  <span className="w-3 h-3 rounded-full bg-red-500 mr-2"></span>
-                  <span>Level 3 - High Impact</span>
-                </div>
-                <div className="flex items-center">
-                  <span className="w-3 h-3 rounded-full bg-orange-500 mr-2"></span>
-                  <span>Level 2 - Moderate Impact</span>
-                </div>
-                <div className="flex items-center">
-                  <span className="w-3 h-3 rounded-full bg-green-500 mr-2"></span>
-                  <span>Level 1 - Low Impact</span>
-                </div>
               </div>
-            </div>
 
-            <div className="bg-gray-50 rounded-2xl p-6 mt-6 border border-gray-200">
-              <h3 className="font-semibold text-gray-900 mb-3">Typhoon Classification</h3>
-              <p className="text-gray-600 text-sm mb-4">Auto-detected based on max sustained wind:</p>
-              <div className="space-y-2 text-xs text-gray-600">
-                <div>TD - Tropical Depression: ≤61 km/h</div>
-                <div>TS - Tropical Storm: 62-88 km/h</div>
-                <div>STS - Severe Tropical Storm: 89-117 km/h</div>
-                <div>TY - Typhoon: 118-184 km/h</div>
-                <div>STY - Super Typhoon: &gt;184 km/h</div>
+              <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
+                <h3 className="font-semibold text-gray-900 mb-3">Typhoon Classification</h3>
+                <p className="text-gray-600 text-sm mb-4">Auto-detected based on max sustained wind:</p>
+                <div className="space-y-2 text-xs text-gray-600">
+                  <div>TD - Tropical Depression: ≤61 km/h</div>
+                  <div>TS - Tropical Storm: 62-88 km/h</div>
+                  <div>STS - Severe Tropical Storm: 89-117 km/h</div>
+                  <div>TY - Typhoon: 118-184 km/h</div>
+                  <div>STY - Super Typhoon: &gt;184 km/h</div>
+                </div>
               </div>
             </div>
           </div>
