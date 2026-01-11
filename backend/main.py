@@ -237,9 +237,9 @@ async def predict_cluster(input_data: ClusteringInput):
         
         # Generate description
         descriptions = {
-            0: "Cluster 0: Typhoon impact pattern identified by the clustering algorithm.",
-            1: "Cluster 1: Typhoon impact pattern identified by the clustering algorithm.",
-            2: "Cluster 2: Typhoon impact pattern identified by the clustering algorithm."
+            0: "Level 3: Typhoon impact pattern identified by the clustering algorithm.",
+            1: "Level 2: Typhoon impact pattern identified by the clustering algorithm.",
+            2: "Level 1: Typhoon impact pattern identified by the clustering algorithm."
         }
         
         return ClusteringResponse(

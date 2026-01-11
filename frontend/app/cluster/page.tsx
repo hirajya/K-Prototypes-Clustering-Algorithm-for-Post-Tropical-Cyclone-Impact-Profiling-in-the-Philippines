@@ -154,10 +154,19 @@ export default function ClusterPage() {
 
   const getClusterLabel = (cluster: number) => {
     switch (cluster) {
-      case 0: return 'High Impact'
-      case 1: return 'Moderate Impact'
-      case 2: return 'Low Impact'
+      case 0: return 'Level 3 - High Impact'
+      case 1: return 'Level 2 - Moderate Impact'
+      case 2: return 'Level 1 - Low Impact'
       default: return 'Unknown'
+    }
+  }
+
+  const getClusterLevelNumber = (cluster: number) => {
+    switch (cluster) {
+      case 0: return '3'
+      case 1: return '2'
+      case 2: return '1'
+      default: return '?'
     }
   }
 
@@ -319,9 +328,11 @@ export default function ClusterPage() {
                   <div className={`p-6 rounded-xl border-2 ${getClusterBgColor(result.cluster)}`}>
                     <div className="text-center">
                       <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full ${getClusterColor(result.cluster)} text-white text-3xl font-bold mb-4`}>
-                        {result.cluster}
+                        {getClusterLevelNumber(result.cluster)}
                       </div>
-                      <h3 className="text-xl font-bold text-gray-900">Cluster {result.cluster}</h3>
+                      <h3 className="text-xl font-bold text-gray-900">
+                         {result.cluster === 0 ? 'Level 3' : result.cluster === 1 ? 'Level 2' : 'Level 1'}
+                      </h3>
                       <p className="text-gray-700 text-sm">{getClusterLabel(result.cluster)}</p>
                     </div>
                   </div>
@@ -343,15 +354,15 @@ export default function ClusterPage() {
               <div className="space-y-2 text-sm">
                 <div className="flex items-center">
                   <span className="w-3 h-3 rounded-full bg-red-500 mr-2"></span>
-                  <span>Cluster 0 - High Impact</span>
+                  <span>Level 3 - High Impact</span>
                 </div>
                 <div className="flex items-center">
                   <span className="w-3 h-3 rounded-full bg-orange-500 mr-2"></span>
-                  <span>Cluster 1 - Moderate Impact</span>
+                  <span>Level 2 - Moderate Impact</span>
                 </div>
                 <div className="flex items-center">
                   <span className="w-3 h-3 rounded-full bg-green-500 mr-2"></span>
-                  <span>Cluster 2 - Low Impact</span>
+                  <span>Level 1 - Low Impact</span>
                 </div>
               </div>
             </div>
