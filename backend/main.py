@@ -104,16 +104,22 @@ models = {
 
 def load_clustering_models():
     """Load clustering models from the models/clustering directory"""
-    clustering_dir = os.path.join(os.path.dirname(__file__), '..', 'models', 'clustering')
+    # Try local models folder first (for Render deployment)
+    clustering_dir = os.path.join(os.path.dirname(__file__), 'models', 'clustering')
+    
+    # If not found, try parent directory (for local development)
+    if not os.path.exists(clustering_dir):
+        clustering_dir = os.path.join(os.path.dirname(__file__), '..', 'models', 'clustering')
     
     try:
         models['clustering'] = joblib.load(os.path.join(clustering_dir, 'clustering_model.joblib'))
         models['scaler'] = joblib.load(os.path.join(clustering_dir, 'scaler.joblib'))
         models['feature_columns'] = joblib.load(os.path.join(clustering_dir, 'feature_columns.joblib'))
-        print("✓ Clustering models loaded successfully")
+        print(f"✓ Clustering models loaded successfully from {clustering_dir}")
         return True
     except FileNotFoundError as e:
         print(f"⚠ Clustering models not found: {e}")
+        print(f"  Searched in: {clustering_dir}")
         print("  Please run the notebook to export the models first.")
         return False
     except Exception as e:
@@ -123,11 +129,16 @@ def load_clustering_models():
 
 def load_prediction_models():
     """Load prediction models from the models/prediction directory"""
-    prediction_dir = os.path.join(os.path.dirname(__file__), '..', 'models', 'prediction')
+    # Try local models folder first (for Render deployment)
+    prediction_dir = os.path.join(os.path.dirname(__file__), 'models', 'prediction')
+    
+    # If not found, try parent directory (for local development)
+    if not os.path.exists(prediction_dir):
+        prediction_dir = os.path.join(os.path.dirname(__file__), '..', 'models', 'prediction')
     
     try:
         models['prediction'] = joblib.load(os.path.join(prediction_dir, 'prediction_model.joblib'))
-        print("✓ Prediction models loaded successfully")
+        print(f"✓ Prediction models loaded successfully from {prediction_dir}")
         return True
     except FileNotFoundError:
         print("⚠ Prediction models not found (not yet implemented)")
