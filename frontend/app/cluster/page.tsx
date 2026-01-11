@@ -174,9 +174,9 @@ export default function ClusterPage() {
     <div className="min-h-screen py-12 bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Clustering Analysis</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Impact Profiling</h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Enter typhoon impact data to identify the cluster pattern
+            Enter tropical cyclone impact data to identify the impact profile
           </p>
         </div>
 
@@ -262,7 +262,7 @@ export default function ClusterPage() {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Typhoon Classification</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">TC Classification</label>
                     <div className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
                       {typhoonClassification.label}
                     </div>
@@ -303,7 +303,7 @@ export default function ClusterPage() {
               <div className="flex gap-4">
                 <button type="submit" disabled={loading}
                   className="flex-1 px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-blue-300">
-                  {loading ? 'Processing...' : 'Predict Cluster'}
+                  {loading ? 'Processing...' : 'Show Impact Profile'}
                 </button>
                 <button type="button" onClick={handleReset}
                   className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300">
@@ -316,7 +316,7 @@ export default function ClusterPage() {
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-6 space-y-6">
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">Clustering Result</h2>
+                <h2 className="text-xl font-semibold text-gray-900 mb-6">Impact Profiling Result</h2>
                 
                 {error && (
                   <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
@@ -369,7 +369,7 @@ export default function ClusterPage() {
               </div>
 
               <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
-                <h3 className="font-semibold text-gray-900 mb-3">Typhoon Classification</h3>
+                <h3 className="font-semibold text-gray-900 mb-3">(TC) Tropical Cyclone Classification</h3>
                 <p className="text-gray-600 text-sm mb-4">Auto-detected based on max sustained wind:</p>
                 <div className="space-y-2 text-xs text-gray-600">
                   <div>TD - Tropical Depression: ≤61 km/h</div>
