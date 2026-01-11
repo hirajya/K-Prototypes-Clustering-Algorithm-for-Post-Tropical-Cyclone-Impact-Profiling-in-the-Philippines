@@ -146,6 +146,11 @@ export default function ClusterPage() {
       errors.total_storm_rainfall = 'Total rainfall seems unrealistic'
     }
 
+    // Total storm rainfall should not be less than maximum 24-hour rainfall
+    if (!isNaN(rainfall24) && !isNaN(rainfallTotal) && rainfall24 > 0 && rainfallTotal > 0 && rainfallTotal < rainfall24) {
+      errors.total_storm_rainfall = 'Total Storm Rainfall cannot be less than Max 24hr Rainfall'
+    }
+
     // Casualty validation (casualties should not exceed persons affected)
     const persons = parseFloat(data.persons) || 0
     const dead = parseFloat(data.dead) || 0
