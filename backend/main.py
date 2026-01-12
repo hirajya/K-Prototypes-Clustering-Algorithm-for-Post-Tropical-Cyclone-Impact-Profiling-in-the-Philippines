@@ -289,9 +289,141 @@ async def predict_cluster(input_data: ClusteringInput):
         
         # Generate description
         descriptions = {
-            0: "Cluster 0: Typhoon impact pattern identified by the clustering algorithm.",
-            1: "Cluster 1: Typhoon impact pattern identified by the clustering algorithm.",
-            2: "Cluster 2: Typhoon impact pattern identified by the clustering algorithm."
+            0: """Severe events with significant casualties, extensive property damage, and large affected populations requiring immediate response.
+
+### Families Affected
+
+Typically **5,000–16,000 families**, with around **9,000 families** affected in most events.
+
+### Persons Affected
+
+Usually **18,500–64,000 people**, with a typical impact of about **37,000 persons**.
+
+### Deaths
+
+Most events report **no deaths**, though **rare extreme cases** can reach up to **around 95 fatalities**.
+
+### Injured / Ill
+
+Generally **none to a few cases**, but injuries can rise to **several dozen** in more severe situations.
+
+### Missing Persons
+
+Typically **no missing persons**, with only **isolated cases** reported during extreme events.
+
+### Totally Damaged Houses
+
+Commonly **hundreds to over 1,000 houses**, with a typical value of around **500 totally damaged homes**.
+
+### Partially Damaged Houses
+
+Usually **2,000–4,700 houses**, indicating widespread but varying structural damage.
+
+### Economic Cost (PHP)
+
+Typically between **₱1.7 million and ₱5.8 million**, with severe cases exceeding **₱16 million**.
+
+### Maximum Sustained Wind
+
+Most events experience **155–195 kph winds**, consistent with strong typhoon conditions.
+
+### 24-Hour Rainfall
+
+Rainfall commonly ranges from **about 47–149 mm**, with extreme events producing much heavier totals.
+
+### Duration of Impact
+
+Impacts generally last **around 4–5 days**, with prolonged cases extending beyond this period.""",
+            1: """Moderate severity events with noticeable damage concentrated in specific regions requiring coordinated response.
+
+### Families Affected
+
+Typically **16–840 families**, with around **235 families** affected in most events.
+
+### Persons Affected
+
+Usually **60–3,300 people**, with a common impact of about **930 persons**.
+
+### Deaths
+
+Most events report **no deaths**, with **rare cases** reaching up to **3 fatalities**.
+
+### Injured / Ill
+
+Generally **none**, but injuries can rise to **around a dozen cases** in some events.
+
+### Missing Persons
+
+Typically **no missing persons**, with only **isolated cases** reported.
+
+### Totally Damaged Houses
+
+Most events report **no totally damaged houses**, though **localized damage** can reach **up to ~2,000 homes**.
+
+### Partially Damaged Houses
+
+Usually **no recorded partial damage**, but **moderate events** may affect **up to ~3,000 houses**.
+
+### Economic Cost (PHP)
+
+Often **minimal or unreported**, but some events incur costs of **up to ₱2 million**.
+
+### Maximum Sustained Wind
+
+Commonly **110–155 kph**, indicating **strong tropical storm to typhoon** conditions.
+
+### 24-Hour Rainfall
+
+Typically **50–117 mm**, with heavier rainfall in more intense cases.
+
+### Duration of Impact
+
+Impacts generally last **around 4–6 days**, with prolonged events extending longer.""",
+            2: """Lower severity events with minimal casualties and limited property damage requiring standard response protocols.
+
+### Families Affected
+
+Typically **13–610 families**, with around **90 families** affected in most cases.
+
+### Persons Affected
+
+Usually **50–2,300 people**, with a common impact of about **320 persons**.
+
+### Deaths
+
+Most events report **no deaths**, with **very rare cases** reaching up to **3 fatalities**.
+
+### Injured / Ill
+
+Generally **none**, though **isolated incidents** may involve injuries.
+
+### Missing Persons
+
+Typically **no missing persons**, with only **rare single cases** reported.
+
+### Totally Damaged Houses
+
+Most events report **no totally damaged houses**, with **limited damage** in rare cases.
+
+### Partially Damaged Houses
+
+Usually **none**, though **localized impacts** can affect **up to ~3,000 houses**.
+
+### Economic Cost (PHP)
+
+Often **zero or minimal**, but **isolated events** can result in **higher reported losses**.
+
+### Maximum Sustained Wind
+
+Commonly **110–195 kph**, reflecting **weak to moderate typhoon** conditions.
+
+### 24-Hour Rainfall
+
+Typically **56–136 mm**, with extreme rainfall occurring only in rare cases.
+
+### Duration of Impact
+
+Impacts generally last **around 4–5 days**, consistent with short-lived events."""
         }
         
         return ClusteringResponse(
