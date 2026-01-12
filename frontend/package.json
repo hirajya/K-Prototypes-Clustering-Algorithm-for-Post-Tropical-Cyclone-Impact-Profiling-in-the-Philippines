@@ -23,5 +23,11 @@
     "postcss": "^8",
     "tailwindcss": "^3.3.0",
     "typescript": "^5"
-  }
+  },
+  "description": "",
+  "main": "next.config.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
 }

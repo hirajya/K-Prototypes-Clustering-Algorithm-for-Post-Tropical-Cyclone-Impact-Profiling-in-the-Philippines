@@ -16,13 +16,7 @@ app = FastAPI(
 # Enable CORS for frontend requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://*.vercel.app",  # All Vercel preview deployments
-        "https://your-app-name.vercel.app",  # Replace with your actual Vercel domain
-        "*"  # Allow all origins (less secure, but works for development)
-    ],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -68,20 +62,17 @@ class ForecastInput(BaseModel):
     min_pressure: float = Field(..., description="Minimum pressure in hPa")
     duration: float = Field(..., description="Duration in hours")
 
-
 class ForecastResponse(BaseModel):
-    """Response from damage prediction"""
+    """Response containing predictions for all impact categories"""
     families: float
     persons: float
     barangays: float
     dead: float
-    injured_ill: float
+    injured: float 
     missing: float
-    cost: float
-    partially_damaged: float
     totally_damaged: float
+    partially_damaged: float
     message: str
-
 
 class HealthResponse(BaseModel):
     """Health check response"""
@@ -93,33 +84,32 @@ class HealthResponse(BaseModel):
 
 # ==================== Model Loading ====================
 
+prediction_targets = [
+    'families', 'person', 'brgy', 'totally', 'partially', 
+    'dead', 'missing', 'injured'
+]
+
 # Global model storage
 models = {
-    'clustering': None,
+    'clustering': {},
     'scaler': None,
     'feature_columns': None,
-    'prediction': None
+    'prediction': {}
 }
 
 
 def load_clustering_models():
     """Load clustering models from the models/clustering directory"""
-    # Try local models folder first (for Render deployment)
-    clustering_dir = os.path.join(os.path.dirname(__file__), 'models', 'clustering')
-    
-    # If not found, try parent directory (for local development)
-    if not os.path.exists(clustering_dir):
-        clustering_dir = os.path.join(os.path.dirname(__file__), '..', 'models', 'clustering')
+    clustering_dir = os.path.join(os.path.dirname(__file__), '..', 'models', 'clustering')
     
     try:
         models['clustering'] = joblib.load(os.path.join(clustering_dir, 'clustering_model.joblib'))
         models['scaler'] = joblib.load(os.path.join(clustering_dir, 'scaler.joblib'))
         models['feature_columns'] = joblib.load(os.path.join(clustering_dir, 'feature_columns.joblib'))
-        print(f"✓ Clustering models loaded successfully from {clustering_dir}")
+        print("✓ Clustering models loaded successfully")
         return True
     except FileNotFoundError as e:
         print(f"⚠ Clustering models not found: {e}")
-        print(f"  Searched in: {clustering_dir}")
         print("  Please run the notebook to export the models first.")
         return False
     except Exception as e:
@@ -128,26 +118,71 @@ def load_clustering_models():
 
 
 def load_prediction_models():
-    """Load prediction models from the models/prediction directory"""
-    # Try local models folder first (for Render deployment)
-    prediction_dir = os.path.join(os.path.dirname(__file__), 'models', 'prediction')
+    """Load all prediction models dynamically"""
+    base_path = os.path.join(os.path.dirname(__file__), '..', 'models', 'prediction')
+    print(base_path)
     
-    # If not found, try parent directory (for local development)
-    if not os.path.exists(prediction_dir):
-        prediction_dir = os.path.join(os.path.dirname(__file__), '..', 'models', 'prediction')
+    print(f"DEBUG: Looking for models in: {os.path.abspath(base_path)}")
     
+
+    loaded_count = 0
+    for target in prediction_targets:
+        try:
+            # Load the trio for each target
+            model = joblib.load(os.path.join(base_path, f'{target}_model.joblib'))
+            scaler = joblib.load(os.path.join(base_path, f'{target}_scaler.joblib'))
+            features = joblib.load(os.path.join(base_path, f'{target}_features.joblib'))
+            
+            models['prediction'][target] = {
+                'model': model,
+                'scaler': scaler,
+                'features': features
+            }
+            loaded_count += 1
+        except FileNotFoundError:
+            print(f"  ⚠ Missing files for target: {target}")
+        except Exception as e:
+            print(f"  ⚠ Error loading {target}: {e}")
+
+    print(f"✓ Prediction models loaded: {loaded_count}/{len(prediction_targets)} targets ready")
+    return loaded_count > 0
+
+def get_weather_features(input_data: ForecastInput) -> Dict[str, float]:
+    return {
+        'max_sustained_wind_kph': input_data.max_sustained_wind,
+        'max_24hr_rainfall_mm': input_data.max_24hr_rainfall,
+        'total_storm_rainfall_mm': input_data.total_storm_rainfall,
+        'min_pressure_hpa': input_data.min_pressure,
+        'duration_in_PAR_hours': input_data.duration,
+    }
+
+def predict_target(target_name: str, assets: dict, weather_data: dict) -> int:
     try:
-        models['prediction'] = joblib.load(os.path.join(prediction_dir, 'prediction_model.joblib'))
-        print(f"✓ Prediction models loaded successfully from {prediction_dir}")
-        return True
-    except FileNotFoundError:
-        print("⚠ Prediction models not found (not yet implemented)")
-        return False
+        model = assets['model']
+        scaler = assets['scaler']
+        required_features = assets['features']
+
+        # Create DataFrame from input dictionary
+        input_df = pd.DataFrame([weather_data])
+
+        # Fill missing columns with 0.0 (Safety check)
+        for feature in required_features:
+            if feature not in input_df.columns:
+                input_df[feature] = 0.0
+        
+        # Reorder columns to match training exactly
+        input_df = input_df[required_features]
+
+        # Scale and Predict
+        scaled_input = scaler.transform(input_df)
+        prediction = model.predict(scaled_input)[0]
+
+        return int(max(0, prediction))
+
     except Exception as e:
-        print(f"⚠ Error loading prediction models: {e}")
-        return False
-
-
+        print(f"   ⚠️ Error predicting '{target_name}': {e}")
+        return 0
+    
 # Load models at startup
 @app.on_event("startup")
 async def startup_event():
@@ -267,59 +302,40 @@ async def predict_cluster(input_data: ClusteringInput):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Clustering prediction error: {str(e)}")
 
-
-@app.post("/forecast", response_model=ForecastResponse, tags=["Prediction"])
+@app.post("/predict", response_model=ForecastResponse, tags=["Prediction"])
 async def predict_damage(input_data: ForecastInput):
     """
-    Predict damage metrics based on weather features.
-    
-    Note: This endpoint is not yet implemented. The prediction model needs to be trained first.
+    Main Endpoint: Predicts ALL targets at once.
     """
-    if models['prediction'] is None:
-        # Return placeholder response indicating feature is not ready
-        return ForecastResponse(
-            families=0,
-            persons=0,
-            barangays=0,
-            dead=0,
-            injured_ill=0,
-            missing=0,
-            cost=0,
-            partially_damaged=0,
-            totally_damaged=0,
-            message="Prediction model not yet available. This feature is coming soon."
-        )
-    
-    try:
-        # Build feature array for prediction
-        features = np.array([[
-            input_data.max_sustained_wind,
-            input_data.typhoon_type if input_data.typhoon_type is not None else 0,
-            input_data.max_24hr_rainfall,
-            input_data.total_storm_rainfall,
-            input_data.min_pressure,
-            input_data.duration
-        ]])
-        
-        # Make predictions
-        predictions = models['prediction'].predict(features)
-        
-        return ForecastResponse(
-            families=float(predictions[0][0]),
-            persons=float(predictions[0][1]),
-            barangays=float(predictions[0][2]),
-            dead=float(predictions[0][3]),
-            injured_ill=float(predictions[0][4]),
-            missing=float(predictions[0][5]),
-            cost=float(predictions[0][6]),
-            partially_damaged=float(predictions[0][7]),
-            totally_damaged=float(predictions[0][8]),
-            message="Prediction successful"
-        )
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+    # 1. Validation
+    if not models.get('prediction'):
+        raise HTTPException(status_code=503, detail="Prediction models not loaded")
 
+    try:
+        # 2. Prepare Data
+        weather_features = get_weather_features(input_data)
+        
+        # 3. Run Predictions Loop (Predicts all of it at once)
+        results = {}
+        for target, assets in models['prediction'].items():
+            results[target] = predict_target(target, assets, weather_features)
+
+        # 4. Construct Response
+        return {
+            "families": results.get('families', 0),
+            "persons": results.get('person', 0),
+            "barangays": results.get('brgy', 0),
+            "dead": results.get('dead', 0),
+            "injured": results.get('injured', 0),
+            "missing": results.get('missing', 0),
+            "totally_damaged": results.get('totally', 0),
+            "partially_damaged": results.get('partially', 0),
+            "message": "Prediction successful"
+        }
+
+    except Exception as e:
+        print(f"Server Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.get("/api/maacli", tags=["MAACLI"])
 async def get_maacli_insights():
