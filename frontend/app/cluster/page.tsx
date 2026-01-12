@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import ReactMarkdown from 'react-markdown'
 
 interface ClusteringResult {
   cluster: number
@@ -369,7 +370,7 @@ export default function ClusterPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Max Sustained Wind (kph)</label>
                     <input type="number" name="max_sustained_wind" value={formData.max_sustained_wind} onChange={handleInputChange}
-                      min="62" required
+                      min="62"
                       className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                         validationErrors.max_sustained_wind ? 'border-red-500' : 'border-gray-300'
                       }`} placeholder="62 or higher" />
@@ -442,44 +443,62 @@ export default function ClusterPage() {
                 </button>
               </div>
             </form>
+
+            {/* Result Display - Moved below form */}
+            {error && (
+              <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-700 text-sm">{error}</p>
+              </div>
+            )}
+
+            {result && (
+              <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-6">Impact Profiling Result</h2>
+                <div className="space-y-6">
+                  <div className={`p-6 rounded-xl border-2 ${getClusterBgColor(result.cluster)}`}>
+                    <div className="text-center">
+                      <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full ${getClusterColor(result.cluster)} text-white text-3xl font-bold mb-4`}>
+                        {getClusterLevelNumber(result.cluster)}
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900">
+                         {result.cluster === 0 ? 'Level 3' : result.cluster === 1 ? 'Level 2' : 'Level 1'}
+                      </h3>
+                      <p className="text-gray-700 text-sm">{getClusterLabel(result.cluster)}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 uppercase mb-3">Description</h4>
+                    <div className="space-y-4">
+                      <ReactMarkdown
+                        components={{
+                          h3: ({ children }) => (
+                            <h3 className="text-sm font-bold text-gray-900 mt-4 mb-2 first:mt-0 border-t border-gray-200 pt-3 first:border-t-0 first:pt-0">
+                              {children}
+                            </h3>
+                          ),
+                          p: ({ children }) => (
+                            <p className="text-sm text-gray-700 leading-relaxed">
+                              {children}
+                            </p>
+                          ),
+                          strong: ({ children }) => (
+                            <strong className="font-semibold text-gray-900">
+                              {children}
+                            </strong>
+                          ),
+                        }}
+                      >
+                        {result.description}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-6 space-y-6">
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">Impact Profiling Result</h2>
-                
-                {error && (
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
-                    <p className="text-red-700 text-sm">{error}</p>
-                  </div>
-                )}
-
-                {result ? (
-                  <div className="space-y-6">
-                    <div className={`p-6 rounded-xl border-2 ${getClusterBgColor(result.cluster)}`}>
-                      <div className="text-center">
-                        <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full ${getClusterColor(result.cluster)} text-white text-3xl font-bold mb-4`}>
-                          {getClusterLevelNumber(result.cluster)}
-                        </div>
-                        <h3 className="text-xl font-bold text-gray-900">
-                           {result.cluster === 0 ? 'Level 3' : result.cluster === 1 ? 'Level 2' : 'Level 1'}
-                        </h3>
-                        <p className="text-gray-700 text-sm">{getClusterLabel(result.cluster)}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-500 uppercase mb-2">Description</h4>
-                      <p className="text-gray-700 text-sm">{result.description}</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <p className="text-gray-500">Enter data and click Predict to see results</p>
-                  </div>
-                )}
-              </div>
-
               <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100">
                 <h3 className="font-semibold text-blue-900 mb-3">MAACLI Framework</h3>
                 <p className="text-blue-800 text-sm mb-4">Clustering analysis using interpretable patterns:</p>
