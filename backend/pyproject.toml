@@ -10,7 +10,7 @@ dependencies = [
 
     # NumPy 2.x compatible stack
     "numpy>=2.0.0",
-    "pandas>=2.2.0",
+    "pandas>=2.2.2",
     "scikit-learn>=1.4.0",
     "joblib>=1.3.2",
 
