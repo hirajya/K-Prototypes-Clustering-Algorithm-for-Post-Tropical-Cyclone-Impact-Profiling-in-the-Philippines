@@ -395,7 +395,7 @@ export default function ClusterPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Min Pressure (hPa)</label>
                     <input type="number" name="min_pressure" value={formData.min_pressure} onChange={handleInputChange}
-                      min="870" max="1013"
+                      min="870" max="1013" step="0.1"
                       className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                         validationErrors.min_pressure ? 'border-red-500' : 'border-gray-300'
                       }`} placeholder="870-1013" />
