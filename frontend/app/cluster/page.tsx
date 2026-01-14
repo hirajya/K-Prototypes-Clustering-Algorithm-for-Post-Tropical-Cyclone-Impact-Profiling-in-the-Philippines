@@ -52,7 +52,7 @@ const getTyphoonType = (maxSustainedWind: number): { type: number; label: string
     return { type: 3, label: 'TY - Typhoon' }
   } else if (maxSustainedWind >= 89) {
     return { type: 2, label: 'STS - Severe Tropical Storm' }
-  } else if (maxSustainedWind >= 62) {
+  } else if (maxSustainedWind >= 60) {
     return { type: 0, label: 'TS - Tropical Storm' }
   } else {
     return { type: 1, label: 'TD - Tropical Depression' }
@@ -119,19 +119,19 @@ export default function ClusterPage() {
     // Wind speed validation: must be provided and > 0, with domain bounds
     const wind = parseFloat(data.max_sustained_wind)
     if (!data.max_sustained_wind || isNaN(wind) || wind <= 0) {
-      errors.max_sustained_wind = 'Max Sustained Wind is required and must be ≥ 62 km/h'
+      errors.max_sustained_wind = 'Max Sustained Wind is required and must be ≥ 60 km/h'
     } else {
-      if (wind < 62) {
-        errors.max_sustained_wind = 'Wind speed must be at least 62 km/h (Tropical Storm threshold)'
-      } else if (wind > 300) {
-        errors.max_sustained_wind = 'Wind speed seems unrealistic (max recorded: ~315 km/h)'
+      if (wind < 60) {
+        errors.max_sustained_wind = 'Wind speed must be at least 60 km/h (Tropical Storm threshold)'
+      } else if (wind > 500) {
+        errors.max_sustained_wind = 'Wind speed seems unrealistic (max recorded: ~500 km/h)'
       }
     }
 
     // Pressure validation
     const pressure = parseFloat(data.min_pressure)
     if (data.min_pressure && pressure > 0) {
-      if (pressure < 870 || pressure > 1013) {
+      if (pressure < 870 || pressure > 1100) {
         errors.min_pressure = 'Pressure must be between 870-1013 hPa (typical typhoon range)'
       }
     }
@@ -371,10 +371,10 @@ export default function ClusterPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Max Sustained Wind (kph)</label>
                     <input type="number" name="max_sustained_wind" value={formData.max_sustained_wind} onChange={handleInputChange}
-                      min="62"
+                      min="60"
                       className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                         validationErrors.max_sustained_wind ? 'border-red-500' : 'border-gray-300'
-                      }`} placeholder="62 or higher" />
+                      }`} placeholder="60 or higher" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">TC Classification</label>
@@ -398,7 +398,7 @@ export default function ClusterPage() {
                       min="870" max="1013" step="0.1"
                       className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                         validationErrors.min_pressure ? 'border-red-500' : 'border-gray-300'
-                      }`} placeholder="870-1013" />
+                      }`} placeholder="870-1100" />
                   </div>
                 </div>
               </div>
