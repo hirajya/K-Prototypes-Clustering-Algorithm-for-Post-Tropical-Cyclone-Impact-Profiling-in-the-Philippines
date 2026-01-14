@@ -179,7 +179,7 @@ export default function PredictionPage() {
         <div className="text-center mb-10">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Future Prediction</h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Predict damage severity and impact metrics based on weather features
+            Predict municipality damage metrics based on tropical cyclones weather features from your nearest weather station.
           </p>
         </div>
 
@@ -191,7 +191,7 @@ export default function PredictionPage() {
               
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Sustained Wind (kph)</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Max Sustained Wind (kph)</label>
                   <input
                     type="number"
                     name="max_sustained_wind"
@@ -211,7 +211,7 @@ export default function PredictionPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Typhoon Classification</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Typhoon Classification</label>
                   <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
                     {typhoonClassification.label}
                   </div>
@@ -219,7 +219,7 @@ export default function PredictionPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Max 24hr Rainfall (mm)</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Max 24hr Rainfall (mm)</label>
                   <input
                     type="number"
                     name="max_24hr_rainfall"
@@ -238,7 +238,7 @@ export default function PredictionPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Storm Rainfall (mm)</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Total Storm Rainfall (mm)</label>
                   <input
                     type="number"
                     name="total_storm_rainfall"
@@ -257,7 +257,7 @@ export default function PredictionPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Min Pressure (hPa)</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Min Pressure (hPa)</label>
                   <input
                     type="number"
                     name="min_pressure"
@@ -277,7 +277,7 @@ export default function PredictionPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Duration (hours)</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Duration (hours)</label>
                   <input
                     type="number"
                     name="duration"
