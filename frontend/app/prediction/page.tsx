@@ -12,7 +12,7 @@ interface ForecastResult {
   missing: number
   partially_damaged: number
   totally_damaged: number
-  // cost and message removed as they are not in the current prediction backend
+  message: string
 }
 
 interface FormData {
@@ -70,28 +70,26 @@ export default function PredictionPage() {
     setResult(null)
 
     try {
-      // 1. Prepare Payload matching ForecastInput in FastAPI
+      // Prepare Payload matching ForecastInput in FastAPI
       const payload = {
         max_sustained_wind: parseFloat(formData.max_sustained_wind) || 0,
         max_24hr_rainfall: parseFloat(formData.max_24hr_rainfall) || 0,
         total_storm_rainfall: parseFloat(formData.total_storm_rainfall) || 0,
         min_pressure: parseFloat(formData.min_pressure) || 0,
-        // Note: duration and typhoon_type are sent but might be ignored 
-        // if your backend Pydantic model doesn't include them.
         duration: parseFloat(formData.duration) || 0,
         typhoon_type: typhoonClassification.type, 
       }
 
-      // 2. Fetch from the /predict endpoint
+      // Use the correct prediction endpoint
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clustering-for-post-tropical-cyclone.onrender.com'
-      const response = await fetch(`${apiUrl}/cluster`, {
+      const response = await fetch(`${apiUrl}/predict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to get prediction' }))
         throw new Error(errorData.detail || 'Failed to get prediction')
       }
 
@@ -222,62 +220,72 @@ export default function PredictionPage() {
 
           {/* Results */}
           <div>
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-6">Prediction Results</h2>
 
               {error && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
-                  <p className="text-red-700 text-sm">{error}</p>
+                  <p className="text-red-700 text-sm font-medium">⚠ Error</p>
+                  <p className="text-red-600 text-sm mt-1">{error}</p>
                 </div>
               )}
 
               {result ? (
-                <div className="space-y-4">
-                  <h3 className="font-medium text-gray-700 border-b pb-2">Estimated Impact</h3>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-500">Families Affected</p>
-                      <p className="text-xl font-bold text-gray-900">{result.families.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-500">Persons Affected</p>
-                      <p className="text-xl font-bold text-gray-900">{result.persons.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-500">Barangays</p>
-                      <p className="text-xl font-bold text-gray-900">{result.barangays.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-red-50 p-4 rounded-lg">
-                      <p className="text-sm text-red-600">Dead</p>
-                      <p className="text-xl font-bold text-red-700">{result.dead.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-orange-50 p-4 rounded-lg">
-                      <p className="text-sm text-orange-600">Injured</p>
-                      <p className="text-xl font-bold text-orange-700">{result.injured.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-yellow-50 p-4 rounded-lg">
-                      <p className="text-sm text-yellow-600">Missing</p>
-                      <p className="text-xl font-bold text-yellow-700">{result.missing.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <p className="text-sm text-blue-600">Partially Damaged</p>
-                      <p className="text-xl font-bold text-blue-900">{result.partially_damaged.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <p className="text-sm text-blue-600">Totally Damaged</p>
-                      <p className="text-xl font-bold text-blue-900">{result.totally_damaged.toLocaleString()}</p>
+                <div className="space-y-6">
+                  {/* Display prediction results */}
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-gray-800 text-sm">Estimated Impact Breakdown:</h3>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                        <p className="text-xs text-blue-600 font-medium mb-1">Families Affected</p>
+                        <p className="text-2xl font-bold text-blue-900">{result.families.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                        <p className="text-xs text-blue-600 font-medium mb-1">Persons Affected</p>
+                        <p className="text-2xl font-bold text-blue-900">{result.persons.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                        <p className="text-xs text-indigo-600 font-medium mb-1">Barangays</p>
+                        <p className="text-2xl font-bold text-indigo-900">{result.barangays.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                        <p className="text-xs text-red-600 font-medium mb-1">Deaths</p>
+                        <p className="text-2xl font-bold text-red-900">{result.dead.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-orange-50 p-4 rounded-lg border border-orange-100">
+                        <p className="text-xs text-orange-600 font-medium mb-1">Injured</p>
+                        <p className="text-2xl font-bold text-orange-900">{result.injured.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
+                        <p className="text-xs text-yellow-600 font-medium mb-1">Missing</p>
+                        <p className="text-2xl font-bold text-yellow-900">{result.missing.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
+                        <p className="text-xs text-purple-600 font-medium mb-1">Totally Damaged</p>
+                        <p className="text-2xl font-bold text-purple-900">{result.totally_damaged.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-pink-50 p-4 rounded-lg border border-pink-100">
+                        <p className="text-xs text-pink-600 font-medium mb-1">Partially Damaged</p>
+                        <p className="text-2xl font-bold text-pink-900">{result.partially_damaged.toLocaleString()}</p>
+                      </div>
                     </div>
                   </div>
+
+                  {result.message && (
+                    <div className="text-xs text-green-600 bg-green-50 p-3 rounded-lg border border-green-100">
+                      ✓ {result.message}
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="text-center py-16">
+                  <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                   </div>
-                  <p className="text-gray-500">Enter weather data and click &quot;Predict Damage&quot; to see results</p>
+                  <p className="text-gray-500 text-sm">Enter weather data and click &quot;Predict Damage&quot; to see results</p>
                 </div>
               )}
             </div>
