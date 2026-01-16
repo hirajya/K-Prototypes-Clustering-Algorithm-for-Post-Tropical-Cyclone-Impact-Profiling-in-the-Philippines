@@ -274,11 +274,11 @@ export default function ClusterPage() {
   const getClusterColor = (cluster: number) => {
     switch (cluster) {
       case 0:
-        return "bg-red-500"; // High Impact
-      case 1:
-        return "bg-orange-500"; // Moderate Impact
-      case 2:
         return "bg-green-500"; // Low Impact
+      case 1:
+        return "bg-red-500"; // High Impact
+      case 2:
+        return "bg-orange-500"; // Moderate Impact
       default:
         return "bg-gray-500";
     }
@@ -287,11 +287,11 @@ export default function ClusterPage() {
   const getClusterBgColor = (cluster: number) => {
     switch (cluster) {
       case 0:
-        return "bg-red-50 border-red-200"; // High Impact
-      case 1:
-        return "bg-orange-50 border-orange-200"; // Moderate Impact
-      case 2:
         return "bg-green-50 border-green-200"; // Low Impact
+      case 1:
+        return "bg-red-50 border-red-200"; // High Impact
+      case 2:
+        return "bg-orange-50 border-orange-200"; // Moderate Impact
       default:
         return "bg-gray-50 border-gray-200";
     }
@@ -300,11 +300,11 @@ export default function ClusterPage() {
   const getClusterLabel = (cluster: number) => {
     switch (cluster) {
       case 0:
-        return "High Impact";
-      case 1:
-        return "Moderate Impact";
-      case 2:
         return "Low Impact";
+      case 1:
+        return "High Impact";
+      case 2:
+        return "Moderate Impact";
       default:
         return "Unknown";
     }
@@ -313,11 +313,11 @@ export default function ClusterPage() {
   const getClusterLevelNumber = (cluster: number) => {
     switch (cluster) {
       case 0:
-        return "3";
-      case 1:
-        return "2";
-      case 2:
         return "1";
+      case 1:
+        return "3";
+      case 2:
+        return "2";
       default:
         return "?";
     }
