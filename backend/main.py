@@ -8,8 +8,8 @@ from typing import List, Dict, Any, Optional
 import os
 
 app = FastAPI(
-    title="Typhoon Impact Clustering & Prediction API",
-    description="API for clustering typhoon impact levels and predicting damage severity",
+    title="Tropical Cyclone Impact Clustering & Prediction API",
+    description="API for clustering tropical cyclone impact levels and predicting damage severity",
     version="1.0.0"
 )
 
@@ -37,7 +37,7 @@ class ClusteringInput(BaseModel):
     cost: float = Field(..., description="Cost of damage in PHP")
     duration_hrs: float = Field(..., description="Duration in hours")
     max_sustained_wind: float = Field(..., description="Maximum sustained wind in kph")
-    typhoon_type: int = Field(..., description="Typhoon type (TS=0, TD=1, STS=2, TY=3, STY=4)")
+    typhoon_type: int = Field(..., description="Tropical cyclone type (TD=0, TS=1, STS=2, TY=3, STY=4)")
     max_24hr_rainfall: float = Field(..., description="Maximum 24hr rainfall in mm")
     total_storm_rainfall: float = Field(..., description="Total storm rainfall in mm")
     min_pressure: float = Field(..., description="Minimum pressure in hPa")
@@ -188,7 +188,7 @@ def predict_target(target_name: str, assets: dict, weather_data: dict) -> int:
 async def startup_event():
     """Load all models when the application starts"""
     print("=" * 60)
-    print("Starting Typhoon Impact API...")
+    print("Starting Tropical Cyclone Impact API...")
     print("=" * 60)
     load_clustering_models()
     load_prediction_models()
@@ -201,7 +201,7 @@ async def startup_event():
 async def root():
     """Root endpoint with API information"""
     return {
-        "message": "Typhoon Impact Clustering & Prediction API",
+        "message": "Tropical Cyclone Impact Clustering & Prediction API",
         "version": "1.0.0",
         "endpoints": {
             "clustering": "/cluster",
@@ -226,11 +226,11 @@ async def health_check():
 @app.post("/cluster", response_model=ClusteringResponse, tags=["Clustering"])
 async def predict_cluster(input_data: ClusteringInput):
     """
-    Predict the cluster assignment for typhoon impact data.
+    Predict the cluster assignment for tropical cyclone impact data.
     
-    Typhoon Type Encoding:
-    - TS (Tropical Storm) = 0
-    - TD (Tropical Depression) = 1
+    Tropical Cyclone Type Encoding:
+    - TD (Tropical Depression) = 0
+    - TS (Tropical Storm) = 1
     - STS (Severe Tropical Storm) = 2
     - TY (Typhoon) = 3
     - STY (Super Typhoon) = 4
@@ -289,7 +289,52 @@ async def predict_cluster(input_data: ClusteringInput):
         
         # Generate description
         descriptions = {
-            0: """Severe events with significant casualties, extensive property damage, and large affected populations requiring immediate response.
+            0: """Lower severity events with minimal casualties and limited property damage requiring standard response protocols.
+
+### Families Affected
+
+Typically **13–610 families**, with around **90 families** affected in most cases.
+
+### Persons Affected
+
+Usually **50–2,300 people**, with a common impact of about **320 persons**.
+
+### Deaths
+
+Most events report **no deaths**, with **very rare cases** reaching up to **3 fatalities**.
+
+### Injured / Ill
+
+Generally **none**, though **isolated incidents** may involve injuries.
+
+### Missing Persons
+
+Typically **no missing persons**, with only **rare single cases** reported.
+
+### Totally Damaged Houses
+
+Most events report **no totally damaged houses**, with **limited damage** in rare cases.
+
+### Partially Damaged Houses
+
+Usually **none**, though **localized impacts** can affect **up to ~3,000 houses**.
+
+### Economic Cost (PHP)
+
+Often **zero or minimal**, but **isolated events** can result in **higher reported losses**.
+
+### Maximum Sustained Wind
+
+Commonly **110–195 kph**, reflecting **weak to moderate typhoon** conditions.
+
+### 24-Hour Rainfall
+
+Typically **56–136 mm**, with extreme rainfall occurring only in rare cases.
+
+### Duration of Impact
+
+Impacts generally last **around 4–5 days**, consistent with short-lived events.""",
+            1: """Severe events with significant casualties, extensive property damage, and large affected populations requiring immediate response.
 
 ### Families Affected
 
@@ -334,7 +379,7 @@ Rainfall commonly ranges from **about 47–149 mm**, with extreme events produci
 ### Duration of Impact
 
 Impacts generally last **around 4–5 days**, with prolonged cases extending beyond this period.""",
-            1: """Moderate severity events with noticeable damage concentrated in specific regions requiring coordinated response.
+            2: """Moderate severity events with noticeable damage concentrated in specific regions requiring coordinated response.
 
 ### Families Affected
 
@@ -378,52 +423,7 @@ Typically **50–117 mm**, with heavier rainfall in more intense cases.
 
 ### Duration of Impact
 
-Impacts generally last **around 4–6 days**, with prolonged events extending longer.""",
-            2: """Lower severity events with minimal casualties and limited property damage requiring standard response protocols.
-
-### Families Affected
-
-Typically **13–610 families**, with around **90 families** affected in most cases.
-
-### Persons Affected
-
-Usually **50–2,300 people**, with a common impact of about **320 persons**.
-
-### Deaths
-
-Most events report **no deaths**, with **very rare cases** reaching up to **3 fatalities**.
-
-### Injured / Ill
-
-Generally **none**, though **isolated incidents** may involve injuries.
-
-### Missing Persons
-
-Typically **no missing persons**, with only **rare single cases** reported.
-
-### Totally Damaged Houses
-
-Most events report **no totally damaged houses**, with **limited damage** in rare cases.
-
-### Partially Damaged Houses
-
-Usually **none**, though **localized impacts** can affect **up to ~3,000 houses**.
-
-### Economic Cost (PHP)
-
-Often **zero or minimal**, but **isolated events** can result in **higher reported losses**.
-
-### Maximum Sustained Wind
-
-Commonly **110–195 kph**, reflecting **weak to moderate typhoon** conditions.
-
-### 24-Hour Rainfall
-
-Typically **56–136 mm**, with extreme rainfall occurring only in rare cases.
-
-### Duration of Impact
-
-Impacts generally last **around 4–5 days**, consistent with short-lived events."""
+Impacts generally last **around 4–6 days**, with prolonged events extending longer."""
         }
         
         return ClusteringResponse(
