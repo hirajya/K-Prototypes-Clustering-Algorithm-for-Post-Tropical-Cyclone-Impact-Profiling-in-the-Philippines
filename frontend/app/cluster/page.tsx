@@ -717,10 +717,10 @@ export default function ClusterPage() {
                       </div>
                       <h3 className="text-xl font-bold text-gray-900">
                         {result.cluster === 0
-                          ? "Level 3"
+                          ? "Level 1"
                           : result.cluster === 1
-                          ? "Level 2"
-                          : "Level 1"}
+                          ? "Level 3"
+                          : "Level 2"}
                       </h3>
                       <p className="text-gray-700 text-sm">
                         {getClusterLabel(result.cluster)}
