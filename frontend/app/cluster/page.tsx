@@ -331,7 +331,8 @@ export default function ClusterPage() {
             Impact Profiling
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Enter tropical cyclone impact data to identify the impact profile
+            Enter tropical cyclone impact data to identify the municipality
+            impact profile
           </p>
         </div>
 
@@ -701,6 +702,7 @@ export default function ClusterPage() {
                 <h2 className="text-xl font-semibold text-gray-900 mb-6">
                   Impact Profiling Result
                 </h2>
+                <p className="text-sm text-gray-600 mb-6">Municipality Level</p>
                 <div className="space-y-6">
                   <div
                     className={`p-6 rounded-xl border-2 ${getClusterBgColor(
