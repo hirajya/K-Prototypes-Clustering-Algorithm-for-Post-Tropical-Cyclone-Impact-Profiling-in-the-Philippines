@@ -54,7 +54,7 @@ const getTyphoonType = (
     return { type: 3, label: "TY - Typhoon" };
   } else if (maxSustainedWind >= 89) {
     return { type: 2, label: "STS - Severe Tropical Storm" };
-  } else if (maxSustainedWind >= 60) {
+  } else if (maxSustainedWind >= 62) {
     return { type: 0, label: "TS - Tropical Storm" };
   } else {
     return { type: 1, label: "TD - Tropical Depression" };
@@ -126,12 +126,9 @@ export default function ClusterPage() {
     const wind = parseFloat(data.max_sustained_wind);
     if (!data.max_sustained_wind || isNaN(wind) || wind <= 0) {
       errors.max_sustained_wind =
-        "Max Sustained Wind is required and must be ≥ 60 km/h";
+        "Max Sustained Wind is required and must be greater than 0 km/h";
     } else {
-      if (wind < 60) {
-        errors.max_sustained_wind =
-          "Wind speed must be at least 60 km/h (Tropical Storm threshold)";
-      } else if (wind > 500) {
+      if (wind > 500) {
         errors.max_sustained_wind =
           "Wind speed seems unrealistic (max recorded: ~500 km/h)";
       }
@@ -556,13 +553,12 @@ export default function ClusterPage() {
                       name="max_sustained_wind"
                       value={formData.max_sustained_wind}
                       onChange={handleInputChange}
-                      min="60"
                       className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                         validationErrors.max_sustained_wind
                           ? "border-red-500"
                           : "border-gray-300"
                       }`}
-                      placeholder="60 or higher"
+                      placeholder="Enter wind speed"
                     />
                   </div>
                   <div>
