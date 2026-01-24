@@ -715,10 +715,10 @@ export default function ClusterPage() {
                       </div>
                       <h3 className="text-xl font-bold text-gray-900">
                         {result.cluster === 0
-                          ? "Level 1"
+                          ? "Cluster 1"
                           : result.cluster === 1
-                          ? "Level 3"
-                          : "Level 2"}
+                          ? "Cluster 3"
+                          : "Cluster 2"}
                       </h3>
                       <p className="text-gray-700 text-sm">
                         {getClusterLabel(result.cluster)}
@@ -770,15 +770,15 @@ export default function ClusterPage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center">
                     <span className="w-3 h-3 rounded-full bg-red-500 mr-2"></span>
-                    <span>Level 3 - High Impact</span>
+                    <span>Cluster 3 - High Impact</span>
                   </div>
                   <div className="flex items-center">
                     <span className="w-3 h-3 rounded-full bg-orange-500 mr-2"></span>
-                    <span>Level 2 - Moderate Impact</span>
+                    <span>Cluster 2 - Moderate Impact</span>
                   </div>
                   <div className="flex items-center">
                     <span className="w-3 h-3 rounded-full bg-green-500 mr-2"></span>
-                    <span>Level 1 - Low Impact</span>
+                    <span>Cluster 1 - Low Impact</span>
                   </div>
                 </div>
               </div>

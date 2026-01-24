@@ -264,7 +264,7 @@ export default function Home() {
                           clipRule="evenodd"
                         />
                       </svg>
-                      Classifies and predicts impact severity levels (High,
+                      Classifies and predicts impact severity clusters (High,
                       Moderate, Low)
                     </li>
                     <li className="flex items-start">
@@ -324,7 +324,7 @@ export default function Home() {
                 Clustering Analysis
               </h3>
               <p className="text-gray-600 mb-4">
-                Classify tropical cyclones impact into Level 1, 2, or 3 based on
+                Classify tropical cyclones impact into Cluster 1, 2, or 3 based on
                 comprehensive impact metrics including affected populations,
                 casualties, and property damage.
               </p>
@@ -387,7 +387,7 @@ export default function Home() {
             {/* Level 3 */}
             <div className="bg-red-50 rounded-xl p-6 border-l-4 border-red-500">
               <div className="flex items-center mb-4">
-                <span className="text-3xl font-bold text-red-600">Level 3</span>
+                <span className="text-3xl font-bold text-red-600">Cluster 3</span>
               </div>
               <h4 className="font-semibold text-gray-900 mb-2">
                 High-Impact Tropical Cyclones
@@ -403,7 +403,7 @@ export default function Home() {
             <div className="bg-yellow-50 rounded-xl p-6 border-l-4 border-yellow-500">
               <div className="flex items-center mb-4">
                 <span className="text-3xl font-bold text-yellow-600">
-                  Level 2
+                  Cluster 2
                 </span>
               </div>
               <h4 className="font-semibold text-gray-900 mb-2">
@@ -419,7 +419,7 @@ export default function Home() {
             <div className="bg-green-50 rounded-xl p-6 border-l-4 border-green-500">
               <div className="flex items-center mb-4">
                 <span className="text-3xl font-bold text-green-600">
-                  Level 1
+                  Cluster 1
                 </span>
               </div>
               <h4 className="font-semibold text-gray-900 mb-2">
