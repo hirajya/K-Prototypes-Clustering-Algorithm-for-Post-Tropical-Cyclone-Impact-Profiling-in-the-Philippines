@@ -307,19 +307,6 @@ export default function ClusterPage() {
     }
   };
 
-  const getClusterLevelNumber = (cluster: number) => {
-    switch (cluster) {
-      case 0:
-        return "1";
-      case 1:
-        return "3";
-      case 2:
-        return "2";
-      default:
-        return "?";
-    }
-  };
-
   return (
     <div className="min-h-screen py-12 bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -711,18 +698,10 @@ export default function ClusterPage() {
                           result.cluster
                         )} text-white text-3xl font-bold mb-4`}
                       >
-                        {getClusterLevelNumber(result.cluster)}
                       </div>
                       <h3 className="text-xl font-bold text-gray-900">
-                        {result.cluster === 0
-                          ? "Cluster 1"
-                          : result.cluster === 1
-                          ? "Cluster 3"
-                          : "Cluster 2"}
-                      </h3>
-                      <p className="text-gray-700 text-sm">
                         {getClusterLabel(result.cluster)}
-                      </p>
+                      </h3>
                     </div>
                   </div>
                   <div>
@@ -770,15 +749,15 @@ export default function ClusterPage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center">
                     <span className="w-3 h-3 rounded-full bg-red-500 mr-2"></span>
-                    <span>Cluster 3 - High Impact</span>
+                    <span>High Impact</span>
                   </div>
                   <div className="flex items-center">
                     <span className="w-3 h-3 rounded-full bg-orange-500 mr-2"></span>
-                    <span>Cluster 2 - Moderate Impact</span>
+                    <span>Moderate Impact</span>
                   </div>
                   <div className="flex items-center">
                     <span className="w-3 h-3 rounded-full bg-green-500 mr-2"></span>
-                    <span>Cluster 1 - Low Impact</span>
+                    <span>Low Impact</span>
                   </div>
                 </div>
               </div>
