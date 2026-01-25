@@ -54,7 +54,7 @@ const getTyphoonType = (
     return { type: 3, label: "TY - Typhoon" };
   } else if (maxSustainedWind >= 89) {
     return { type: 2, label: "STS - Severe Tropical Storm" };
-  } else if (maxSustainedWind >= 60) {
+  } else if (maxSustainedWind >= 62) {
     return { type: 0, label: "TS - Tropical Storm" };
   } else {
     return { type: 1, label: "TD - Tropical Depression" };
@@ -126,12 +126,9 @@ export default function ClusterPage() {
     const wind = parseFloat(data.max_sustained_wind);
     if (!data.max_sustained_wind || isNaN(wind) || wind <= 0) {
       errors.max_sustained_wind =
-        "Max Sustained Wind is required and must be ≥ 60 km/h";
+        "Max Sustained Wind is required and must be greater than 0 km/h";
     } else {
-      if (wind < 60) {
-        errors.max_sustained_wind =
-          "Wind speed must be at least 60 km/h (Tropical Storm threshold)";
-      } else if (wind > 500) {
+      if (wind > 500) {
         errors.max_sustained_wind =
           "Wind speed seems unrealistic (max recorded: ~500 km/h)";
       }
@@ -310,19 +307,6 @@ export default function ClusterPage() {
     }
   };
 
-  const getClusterLevelNumber = (cluster: number) => {
-    switch (cluster) {
-      case 0:
-        return "1";
-      case 1:
-        return "3";
-      case 2:
-        return "2";
-      default:
-        return "?";
-    }
-  };
-
   return (
     <div className="min-h-screen py-12 bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -331,7 +315,8 @@ export default function ClusterPage() {
             Impact Profiling
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Enter tropical cyclone impact data to identify the impact profile
+            Enter tropical cyclone impact data to identify the municipality
+            impact profile
           </p>
         </div>
 
@@ -555,13 +540,12 @@ export default function ClusterPage() {
                       name="max_sustained_wind"
                       value={formData.max_sustained_wind}
                       onChange={handleInputChange}
-                      min="60"
                       className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                         validationErrors.max_sustained_wind
                           ? "border-red-500"
                           : "border-gray-300"
                       }`}
-                      placeholder="60 or higher"
+                      placeholder="Enter wind speed"
                     />
                   </div>
                   <div>
@@ -701,6 +685,7 @@ export default function ClusterPage() {
                 <h2 className="text-xl font-semibold text-gray-900 mb-6">
                   Impact Profiling Result
                 </h2>
+                <p className="text-sm text-gray-600 mb-6">Municipality Level</p>
                 <div className="space-y-6">
                   <div
                     className={`p-6 rounded-xl border-2 ${getClusterBgColor(
@@ -713,18 +698,10 @@ export default function ClusterPage() {
                           result.cluster
                         )} text-white text-3xl font-bold mb-4`}
                       >
-                        {getClusterLevelNumber(result.cluster)}
                       </div>
                       <h3 className="text-xl font-bold text-gray-900">
-                        {result.cluster === 0
-                          ? "Level 1"
-                          : result.cluster === 1
-                          ? "Level 3"
-                          : "Level 2"}
-                      </h3>
-                      <p className="text-gray-700 text-sm">
                         {getClusterLabel(result.cluster)}
-                      </p>
+                      </h3>
                     </div>
                   </div>
                   <div>
@@ -772,15 +749,15 @@ export default function ClusterPage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center">
                     <span className="w-3 h-3 rounded-full bg-red-500 mr-2"></span>
-                    <span>Level 3 - High Impact</span>
+                    <span>High Impact</span>
                   </div>
                   <div className="flex items-center">
                     <span className="w-3 h-3 rounded-full bg-orange-500 mr-2"></span>
-                    <span>Level 2 - Moderate Impact</span>
+                    <span>Moderate Impact</span>
                   </div>
                   <div className="flex items-center">
                     <span className="w-3 h-3 rounded-full bg-green-500 mr-2"></span>
-                    <span>Level 1 - Low Impact</span>
+                    <span>Low Impact</span>
                   </div>
                 </div>
               </div>
