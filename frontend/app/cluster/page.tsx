@@ -134,24 +134,38 @@ export default function ClusterPage() {
       }
     }
 
-    // Pressure validation
-    const pressure = parseFloat(data.min_pressure);
-    if (data.min_pressure && pressure > 0) {
-      if (pressure < 870 || pressure > 1100) {
-        errors.min_pressure =
-          "Pressure must be between 870-1013 hPa (typical typhoon range)";
-      }
+    // Duration validation: must be > 0
+    const duration = parseFloat(data.duration_hrs);
+    if (!data.duration_hrs || isNaN(duration) || duration <= 0) {
+      errors.duration_hrs = "Duration is required and must be greater than 0 hours";
+    } else if (duration > 720) {
+      // 30 days
+      errors.duration_hrs =
+        "Duration exceeds typical typhoon lifespan (30 days)";
     }
 
-    // Rainfall validation
+    // Pressure validation: must be > 0
+    const pressure = parseFloat(data.min_pressure);
+    if (!data.min_pressure || isNaN(pressure) || pressure <= 0) {
+      errors.min_pressure = "Min Pressure is required and must be greater than 0 hPa";
+    } else if (pressure < 870 || pressure > 1100) {
+      errors.min_pressure =
+        "Pressure must be between 870-1100 hPa (typical typhoon range)";
+    }
+
+    // Rainfall validation: must be > 0
     const rainfall24 = parseFloat(data.max_24hr_rainfall);
-    if (rainfall24 > 2000) {
+    if (!data.max_24hr_rainfall || isNaN(rainfall24) || rainfall24 <= 0) {
+      errors.max_24hr_rainfall = "Max 24hr Rainfall is required and must be greater than 0 mm";
+    } else if (rainfall24 > 2000) {
       errors.max_24hr_rainfall =
         "Daily rainfall exceeds world record (1,825mm)";
     }
 
     const rainfallTotal = parseFloat(data.total_storm_rainfall);
-    if (rainfallTotal > 5000) {
+    if (!data.total_storm_rainfall || isNaN(rainfallTotal) || rainfallTotal <= 0) {
+      errors.total_storm_rainfall = "Total Storm Rainfall is required and must be greater than 0 mm";
+    } else if (rainfallTotal > 5000) {
       errors.total_storm_rainfall = "Total rainfall seems unrealistic";
     }
 
@@ -175,14 +189,6 @@ export default function ClusterPage() {
 
     if (dead + injured + missing > persons && persons > 0) {
       errors.persons = "Total casualties cannot exceed persons affected";
-    }
-
-    // Duration validation
-    const duration = parseFloat(data.duration_hrs);
-    if (duration > 720) {
-      // 30 days
-      errors.duration_hrs =
-        "Duration exceeds typical typhoon lifespan (30 days)";
     }
 
     // Houses validation
