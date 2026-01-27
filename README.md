@@ -385,8 +385,8 @@ Content-Type: application/json
 ```
 
 **Typhoon Type Encoding (Label Encoding):**
-- `0` = TS (Tropical Storm)
-- `1` = TD (Tropical Depression)
+- `0` = TS (Tropical Depression)
+- `1` = TD (Tropical Storm)
 - `2` = STS (Severe Tropical Storm)
 - `3` = TY (Typhoon)
 - `4` = STY (Super Typhoon)
