@@ -747,7 +747,7 @@ export default function ClusterPage() {
             <div className="lg:sticky lg:top-6 space-y-6">
               <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100">
                 <h3 className="font-semibold text-blue-900 mb-3">
-                  MAACLI Framework
+                  Severity Levels
                 </h3>
                 <p className="text-blue-800 text-sm mb-4">
                   Clustering analysis using interpretable patterns:
