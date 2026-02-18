@@ -800,7 +800,7 @@ export default function PhilippinesWeatherStationPage() {
             zIndex: 1,
           }}>
             <span style={{ fontWeight: 700, fontSize: 13 }}>
-              📍 {stationLabel || "Station Information"}
+              {stationLabel || "Station Information"}
             </span>
             <button
               onClick={() => setPanelOpen(false)}
@@ -852,7 +852,7 @@ export default function PhilippinesWeatherStationPage() {
 
               {/* Nearest Weather Station */}
               <div style={{ fontSize: 11.5, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>
-                📡 Nearest Weather Station
+                Nearest Weather Station
               </div>
               {nearestStation ? (
                 <div style={{
@@ -907,7 +907,7 @@ export default function PhilippinesWeatherStationPage() {
 
               {/* Station-specific disclaimer */}
               <div style={{ fontSize: 11.5, fontWeight: 700, color: "#16a34a", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>
-                📌 Station Geographic Note
+                Station Geographic Note
               </div>
               <div style={{
                 background: disclaimer ? "#fffbeb" : "#f9fafb",
