@@ -45,6 +45,12 @@ interface BulkDataRow {
   region: number;
   impact_level?: string;
   cluster?: number;
+  rowNumber?: number; // Track original row number
+}
+
+interface ValidationError {
+  rowNumber: number;
+  errors: string[];
 }
 
 const initialFormData: FormData = {
@@ -104,6 +110,8 @@ export default function ClusterPage() {
   const [bulkResults, setBulkResults] = useState<BulkDataRow[]>([]);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkError, setBulkError] = useState("");
+  const [bulkValidationErrors, setBulkValidationErrors] = useState<ValidationError[]>([]);
+  const [missingColumns, setMissingColumns] = useState<string[]>([]);
 
   // Auto-detect typhoon type based on max sustained wind
   const typhoonClassification = useMemo(() => {
@@ -237,6 +245,341 @@ export default function ClusterPage() {
     return validateFormData(formData);
   };
 
+  const validateBulkRow = (row: BulkDataRow, rowIndex: number): string[] => {
+    const errors: string[] = [];
+
+    // Check for required fields
+    if (!row.families || row.families < 0) {
+      errors.push("Families must be >= 0");
+    }
+    if (!row.persons || row.persons < 0) {
+      errors.push("Persons must be >= 0");
+    }
+    if (!row.barangays || row.barangays < 0) {
+      errors.push("Barangays must be >= 0");
+    }
+
+    // Wind speed validation
+    const wind = row.max_sustained_wind;
+    if (!wind || wind <= 0) {
+      errors.push("Wind speed is required and must be > 0 km/h");
+    } else if (wind > 500) {
+      errors.push("Wind speed exceeds realistic maximum (500 km/h)");
+    }
+
+    // Duration validation
+    const duration = row.duration_hrs;
+    if (!duration || duration <= 0) {
+      errors.push("Duration must be > 0 hours");
+    } else if (duration > 720) {
+      errors.push("Duration exceeds typical typhoon lifespan (30 days)");
+    }
+
+    // Pressure validation
+    const pressure = row.min_pressure;
+    if (!pressure || pressure <= 0) {
+      errors.push("Pressure is required and must be > 0 hPa");
+    } else if (pressure < 870 || pressure > 1100) {
+      errors.push("Pressure must be between 870-1100 hPa");
+    }
+
+    // Rainfall validation
+    const rainfall24 = row.max_24hr_rainfall;
+    if (!rainfall24 || rainfall24 <= 0) {
+      errors.push("24hr Rainfall must be > 0 mm");
+    } else if (rainfall24 > 2000) {
+      errors.push("24hr Rainfall exceeds world record (1,825mm)");
+    }
+
+    const rainfallTotal = row.total_storm_rainfall;
+    if (!rainfallTotal || rainfallTotal <= 0) {
+      errors.push("Total Rainfall must be > 0 mm");
+    } else if (rainfallTotal > 5000) {
+      errors.push("Total Rainfall seems unrealistic");
+    }
+
+    // Total rainfall should be >= 24hr rainfall
+    if (rainfall24 > 0 && rainfallTotal > 0 && rainfallTotal < rainfall24) {
+      errors.push("Total Rainfall cannot be less than 24hr Rainfall");
+    }
+
+    // Casualty validation
+    const persons = row.persons || 0;
+    const dead = row.dead || 0;
+    const injured = row.injured_ill || 0;
+    const missing = row.missing || 0;
+
+    if (dead + injured + missing > persons && persons > 0) {
+      errors.push("Total casualties exceed persons affected");
+    }
+
+    // Houses validation
+    const totallyDamaged = row.totally_damaged || 0;
+    const partiallyDamaged = row.partially_damaged || 0;
+    const families = row.families || 0;
+
+    if (totallyDamaged + partiallyDamaged > families * 2 && families > 0) {
+      errors.push("Damaged houses seem disproportionate to families affected");
+    }
+
+    // Region validation
+    if (!row.region || ![2, 3, 5, 8].includes(row.region)) {
+      errors.push("Region must be 2, 3, 5, or 8");
+    }
+
+    return errors;
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet) as any[];
+
+        if (jsonData.length === 0) {
+          setBulkError("The uploaded file is empty");
+          return;
+        }
+
+        // Normalize column name for comparison
+        const normalizeColumn = (col: string): string => {
+          return col.toLowerCase().replace(/[^a-z0-9]/g, '');
+        };
+
+        // Check for required columns
+        const requiredColumns = [
+          'families', 'persons', 'barangays', 'dead', 'injured_ill', 
+          'missing', 'totally_damaged', 'partially_damaged', 'cost', 
+          'duration_hrs', 'max_sustained_wind', 'max_24hr_rainfall', 
+          'total_storm_rainfall', 'min_pressure', 'region'
+        ];
+
+        const firstRow = jsonData[0];
+        const actualColumns = Object.keys(firstRow);
+        const normalizedActualColumns = actualColumns.map(normalizeColumn);
+        
+        // Map each required column to possible variations
+        const columnMapping: Record<string, string[]> = {
+          'families': ['families'],
+          'persons': ['persons'],
+          'barangays': ['barangays', 'barangaysaffected'],
+          'dead': ['dead'],
+          'injured_ill': ['injuredill', 'injured', 'injuryill'],
+          'missing': ['missing'],
+          'totally_damaged': ['totallydamaged', 'totallydamagehouses'],
+          'partially_damaged': ['partiallydamaged', 'partiallydamagedhouses'],
+          'cost': ['cost', 'costphp'],
+          'duration_hrs': ['durationhrs', 'duration'],
+          'max_sustained_wind': ['maxsustainedwind', 'maxwind', 'wind'],
+          'max_24hr_rainfall': ['max24hrrainfall', 'rainfall24', 'rainfall24hr', '24hrrainfall'],
+          'total_storm_rainfall': ['totalstormrainfall', 'totalrainfall'],
+          'min_pressure': ['minpressure', 'pressure'],
+          'region': ['region']
+        };
+
+        const missing: string[] = [];
+        const foundColumns: Record<string, string> = {}; // Map required column to actual column name
+        
+        requiredColumns.forEach(requiredCol => {
+          const variations = columnMapping[requiredCol] || [requiredCol.replace(/_/g, '')];
+          let found = false;
+          
+          for (const actualCol of actualColumns) {
+            const normalizedActual = normalizeColumn(actualCol);
+            if (variations.some(v => normalizedActual === normalizeColumn(v))) {
+              foundColumns[requiredCol] = actualCol;
+              found = true;
+              break;
+            }
+          }
+          
+          if (!found) {
+            missing.push(requiredCol);
+          }
+        });
+
+        if (missing.length > 0) {
+          setMissingColumns(missing);
+          setBulkError(`Missing required columns: ${missing.join(', ')}`);
+          return;
+        }
+
+        setMissingColumns([]);
+
+        // Map the Excel columns to our expected format using the found column mapping
+        const mappedData: BulkDataRow[] = jsonData.map((row, index) => ({
+          families: Number(row[foundColumns['families']] || 0),
+          persons: Number(row[foundColumns['persons']] || 0),
+          barangays: Number(row[foundColumns['barangays']] || 0),
+          dead: Number(row[foundColumns['dead']] || 0),
+          injured_ill: Number(row[foundColumns['injured_ill']] || 0),
+          missing: Number(row[foundColumns['missing']] || 0),
+          totally_damaged: Number(row[foundColumns['totally_damaged']] || 0),
+          partially_damaged: Number(row[foundColumns['partially_damaged']] || 0),
+          cost: Number(row[foundColumns['cost']] || 0),
+          duration_hrs: Number(row[foundColumns['duration_hrs']] || 0),
+          max_sustained_wind: Number(row[foundColumns['max_sustained_wind']] || 0),
+          max_24hr_rainfall: Number(row[foundColumns['max_24hr_rainfall']] || 0),
+          total_storm_rainfall: Number(row[foundColumns['total_storm_rainfall']] || 0),
+          min_pressure: Number(row[foundColumns['min_pressure']] || 0),
+          region: Number(row[foundColumns['region']] || 2),
+          rowNumber: index + 2, // +2 because Excel is 1-indexed and has header row
+        }));
+
+        // Validate all rows
+        const errors: ValidationError[] = [];
+        mappedData.forEach((row, index) => {
+          const rowErrors = validateBulkRow(row, index);
+          if (rowErrors.length > 0) {
+            errors.push({
+              rowNumber: row.rowNumber || index + 2,
+              errors: rowErrors,
+            });
+          }
+        });
+
+        setBulkValidationErrors(errors);
+        setBulkData(mappedData);
+        setBulkResults([]);
+        
+        if (errors.length > 0) {
+          setBulkError(`Found ${errors.length} row(s) with validation errors. Please review below.`);
+        } else {
+          setBulkError("");
+        }
+      } catch (err) {
+        setBulkError("Failed to parse file. Please check the format.");
+        console.error(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleBulkPredict = async () => {
+    if (bulkData.length === 0) {
+      setBulkError("Please upload a file first");
+      return;
+    }
+
+    if (bulkValidationErrors.length > 0) {
+      setBulkError("Please fix validation errors before predicting");
+      return;
+    }
+
+    setBulkLoading(true);
+    setBulkError("");
+
+    try {
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ||
+        "https://clustering-for-post-tropical-cyclone.onrender.com";
+
+      const results: BulkDataRow[] = [];
+
+      for (const row of bulkData) {
+        const typhoonType = getTyphoonType(row.max_sustained_wind);
+        
+        const payload = {
+          families: row.families,
+          persons: row.persons,
+          barangays: row.barangays,
+          dead: row.dead,
+          injured_ill: row.injured_ill,
+          missing: row.missing,
+          totally_damaged: row.totally_damaged,
+          partially_damaged: row.partially_damaged,
+          cost: row.cost,
+          duration_hrs: row.duration_hrs,
+          max_sustained_wind: row.max_sustained_wind,
+          typhoon_type: typhoonType.type,
+          max_24hr_rainfall: row.max_24hr_rainfall,
+          total_storm_rainfall: row.total_storm_rainfall,
+          min_pressure: row.min_pressure,
+          region: row.region,
+        };
+
+        const response = await fetch(`${apiUrl}/cluster`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          results.push({
+            ...row,
+            cluster: data.cluster,
+            impact_level: getClusterLabel(data.cluster),
+          });
+        } else {
+          results.push({
+            ...row,
+            cluster: -1,
+            impact_level: "Error",
+          });
+        }
+      }
+
+      setBulkResults(results);
+    } catch (err) {
+      setBulkError(
+        err instanceof Error ? err.message : "Failed to process bulk predictions"
+      );
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        families: 100,
+        persons: 450,
+        barangays: 5,
+        dead: 0,
+        injured_ill: 2,
+        missing: 0,
+        totally_damaged: 10,
+        partially_damaged: 25,
+        cost: 150000,
+        duration_hrs: 48,
+        max_sustained_wind: 120,
+        max_24hr_rainfall: 85,
+        total_storm_rainfall: 200,
+        min_pressure: 980,
+        region: 2,
+      },
+      {
+        families: 250,
+        persons: 1200,
+        barangays: 8,
+        dead: 1,
+        injured_ill: 5,
+        missing: 0,
+        totally_damaged: 30,
+        partially_damaged: 60,
+        cost: 500000,
+        duration_hrs: 72,
+        max_sustained_wind: 150,
+        max_24hr_rainfall: 110,
+        total_storm_rainfall: 300,
+        min_pressure: 965,
+        region: 3,
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+    XLSX.writeFile(workbook, "bulk_prediction_template.csv");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -341,116 +684,12 @@ export default function ClusterPage() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet) as any[];
-
-        // Map the Excel columns to our expected format
-        const mappedData: BulkDataRow[] = jsonData.map((row) => ({
-          families: Number(row.families || row.Families || 0),
-          persons: Number(row.persons || row.Persons || 0),
-          barangays: Number(row.barangays || row.Barangays || row.barangays_affected || 0),
-          dead: Number(row.dead || row.Dead || 0),
-          injured_ill: Number(row.injured_ill || row["Injured/Ill"] || row.injured || 0),
-          missing: Number(row.missing || row.Missing || 0),
-          totally_damaged: Number(row.totally_damaged || row["Totally Damaged"] || 0),
-          partially_damaged: Number(row.partially_damaged || row["Partially Damaged"] || 0),
-          cost: Number(row.cost || row.Cost || 0),
-          duration_hrs: Number(row.duration_hrs || row["Duration (hrs)"] || row.duration || 0),
-          max_sustained_wind: Number(row.max_sustained_wind || row["Max Wind"] || row.wind || 0),
-          max_24hr_rainfall: Number(row.max_24hr_rainfall || row["24hr Rainfall"] || row.rainfall_24 || 0),
-          total_storm_rainfall: Number(row.total_storm_rainfall || row["Total Rainfall"] || row.total_rainfall || 0),
-          min_pressure: Number(row.min_pressure || row["Min Pressure"] || row.pressure || 0),
-          region: Number(row.region || row.Region || 2),
-        }));
-
-        setBulkData(mappedData);
-        setBulkResults([]);
-        setBulkError("");
-      } catch (err) {
-        setBulkError("Failed to parse Excel file. Please check the format.");
-        console.error(err);
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  const handleBulkPredict = async () => {
-    if (bulkData.length === 0) {
-      setBulkError("Please upload a file first");
-      return;
-    }
-
-    setBulkLoading(true);
+  const clearBulkData = () => {
+    setBulkData([]);
+    setBulkResults([]);
     setBulkError("");
-
-    try {
-      const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL ||
-        "https://clustering-for-post-tropical-cyclone.onrender.com";
-
-      const results: BulkDataRow[] = [];
-
-      for (const row of bulkData) {
-        const typhoonType = getTyphoonType(row.max_sustained_wind);
-        
-        const payload = {
-          families: row.families,
-          persons: row.persons,
-          barangays: row.barangays,
-          dead: row.dead,
-          injured_ill: row.injured_ill,
-          missing: row.missing,
-          totally_damaged: row.totally_damaged,
-          partially_damaged: row.partially_damaged,
-          cost: row.cost,
-          duration_hrs: row.duration_hrs,
-          max_sustained_wind: row.max_sustained_wind,
-          typhoon_type: typhoonType.type,
-          max_24hr_rainfall: row.max_24hr_rainfall,
-          total_storm_rainfall: row.total_storm_rainfall,
-          min_pressure: row.min_pressure,
-          region: row.region,
-        };
-
-        const response = await fetch(`${apiUrl}/cluster`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          results.push({
-            ...row,
-            cluster: data.cluster,
-            impact_level: getClusterLabel(data.cluster),
-          });
-        } else {
-          results.push({
-            ...row,
-            cluster: -1,
-            impact_level: "Error",
-          });
-        }
-      }
-
-      setBulkResults(results);
-    } catch (err) {
-      setBulkError(
-        err instanceof Error ? err.message : "Failed to process bulk predictions"
-      );
-    } finally {
-      setBulkLoading(false);
-    }
+    setBulkValidationErrors([]);
+    setMissingColumns([]);
   };
 
   const handleExportResults = () => {
@@ -483,12 +722,6 @@ export default function ClusterPage() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Predictions");
     XLSX.writeFile(workbook, `cluster_predictions_${Date.now()}.xlsx`);
-  };
-
-  const clearBulkData = () => {
-    setBulkData([]);
-    setBulkResults([]);
-    setBulkError("");
   };
 
   return (
@@ -1002,9 +1235,30 @@ export default function ClusterPage() {
           <div className="space-y-6">
             {/* File Upload Section */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">
-                Bulk Prediction
-              </h2>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Bulk Prediction
+                </h2>
+                <button
+                  onClick={handleDownloadTemplate}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  Download Template
+                </button>
+              </div>
               
               <div className="space-y-4">
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
@@ -1043,7 +1297,7 @@ export default function ClusterPage() {
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <h4 className="text-sm font-semibold text-blue-900 mb-2">
-                    Expected Columns:
+                    Required Columns:
                   </h4>
                   <p className="text-xs text-blue-800">
                     families, persons, barangays, dead, injured_ill, missing, 
@@ -1053,13 +1307,50 @@ export default function ClusterPage() {
                   </p>
                 </div>
 
+                {/* Missing Columns Error */}
+                {missingColumns.length > 0 && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <h4 className="text-sm font-semibold text-red-900 mb-2">
+                      ❌ Missing Required Columns:
+                    </h4>
+                    <ul className="list-disc list-inside text-xs text-red-800">
+                      {missingColumns.map((col) => (
+                        <li key={col}>{col}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Validation Errors */}
+                {bulkValidationErrors.length > 0 && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg max-h-96 overflow-y-auto">
+                    <h4 className="text-sm font-semibold text-yellow-900 mb-3 sticky top-0 bg-yellow-50 pb-2">
+                      ⚠️ Validation Errors ({bulkValidationErrors.length} row{bulkValidationErrors.length > 1 ? 's' : ''})
+                    </h4>
+                    <div className="space-y-3">
+                      {bulkValidationErrors.map((error) => (
+                        <div key={error.rowNumber} className="border-l-4 border-yellow-400 pl-3">
+                          <p className="text-xs font-semibold text-yellow-900 mb-1">
+                            Row {error.rowNumber}:
+                          </p>
+                          <ul className="list-disc list-inside text-xs text-yellow-800 space-y-1">
+                            {error.errors.map((err, idx) => (
+                              <li key={idx}>{err}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {bulkData.length > 0 && (
                   <div className="flex gap-4">
                     <button
                       onClick={handleBulkPredict}
-                      disabled={bulkLoading}
+                      disabled={bulkLoading || bulkValidationErrors.length > 0}
                       className={`flex-1 px-6 py-3 font-semibold rounded-lg ${
-                        bulkLoading
+                        bulkLoading || bulkValidationErrors.length > 0
                           ? "bg-gray-400 text-gray-200 cursor-not-allowed"
                           : "bg-blue-600 text-white hover:bg-blue-700"
                       }`}
@@ -1083,7 +1374,7 @@ export default function ClusterPage() {
                   </div>
                 )}
 
-                {bulkError && (
+                {bulkError && !bulkValidationErrors.length && (
                   <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
                     <p className="text-red-700 text-sm">{bulkError}</p>
                   </div>
@@ -1096,11 +1387,17 @@ export default function ClusterPage() {
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
                   Data Preview ({bulkData.length} rows)
+                  {bulkValidationErrors.length > 0 && (
+                    <span className="ml-2 text-sm font-normal text-yellow-600">
+                      • {bulkValidationErrors.length} row(s) with errors
+                    </span>
+                  )}
                 </h3>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Row</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Families</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Persons</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Barangays</th>
@@ -1113,33 +1410,40 @@ export default function ClusterPage() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {(bulkResults.length > 0 ? bulkResults : bulkData).slice(0, 10).map((row, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-3 py-2 text-sm text-gray-900">{row.families}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900">{row.persons}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900">{row.barangays}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900">{row.dead}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900">{row.max_sustained_wind}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900">{row.region}</td>
-                          {bulkResults.length > 0 && (
-                            <td className="px-3 py-2 text-sm">
-                              <span
-                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                  row.cluster === 0
-                                    ? "bg-green-100 text-green-800"
-                                    : row.cluster === 1
-                                    ? "bg-red-100 text-red-800"
-                                    : row.cluster === 2
-                                    ? "bg-orange-100 text-orange-800"
-                                    : "bg-gray-100 text-gray-800"
-                                }`}
-                              >
-                                {row.impact_level}
-                              </span>
+                      {(bulkResults.length > 0 ? bulkResults : bulkData).slice(0, 10).map((row, idx) => {
+                        const hasError = bulkValidationErrors.some(e => e.rowNumber === row.rowNumber);
+                        return (
+                          <tr key={idx} className={`${hasError ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
+                            <td className="px-3 py-2 text-sm text-gray-900">
+                              {row.rowNumber}
+                              {hasError && <span className="ml-1 text-yellow-600">⚠️</span>}
                             </td>
-                          )}
-                        </tr>
-                      ))}
+                            <td className="px-3 py-2 text-sm text-gray-900">{row.families}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900">{row.persons}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900">{row.barangays}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900">{row.dead}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900">{row.max_sustained_wind}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900">{row.region}</td>
+                            {bulkResults.length > 0 && (
+                              <td className="px-3 py-2 text-sm">
+                                <span
+                                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                    row.cluster === 0
+                                      ? "bg-green-100 text-green-800"
+                                      : row.cluster === 1
+                                      ? "bg-red-100 text-red-800"
+                                      : row.cluster === 2
+                                      ? "bg-orange-100 text-orange-800"
+                                      : "bg-gray-100 text-gray-800"
+                                  }`}
+                                >
+                                  {row.impact_level}
+                                </span>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                   {bulkData.length > 10 && (
