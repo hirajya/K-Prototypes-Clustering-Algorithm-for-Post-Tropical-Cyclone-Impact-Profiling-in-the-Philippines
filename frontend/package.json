@@ -9,10 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "leaflet": "^1.9.4",
     "next": "^14.2.35",
     "react": "^18",
     "react-dom": "^18",
     "react-markdown": "^10.1.0",
+    "recharts": "^3.7.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

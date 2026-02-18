@@ -1,8 +1,23 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import * as XLSX from "xlsx";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+} from "recharts";
 
 interface ClusteringResult {
   cluster: number;
@@ -697,6 +712,118 @@ export default function ClusterPage() {
     }
   };
 
+  // Get typical ranges for each cluster based on historical data
+  const getClusterRanges = () => {
+    return {
+      0: { // Low Impact
+        casualties: { min: 0, max: 5, avg: 1 },
+        damaged: { min: 0, max: 50, avg: 15 },
+        cost: { min: 0, max: 500000, avg: 100000 },
+        wind: { min: 60, max: 120, avg: 85 },
+        rainfall: { min: 50, max: 300, avg: 150 },
+        pressure: { min: 980, max: 1010, avg: 995 },
+      },
+      1: { // High Impact
+        casualties: { min: 20, max: 200, avg: 80 },
+        damaged: { min: 200, max: 2000, avg: 800 },
+        cost: { min: 2000000, max: 50000000, avg: 15000000 },
+        wind: { min: 150, max: 250, avg: 185 },
+        rainfall: { min: 400, max: 1500, avg: 800 },
+        pressure: { min: 900, max: 970, avg: 940 },
+      },
+      2: { // Moderate Impact
+        casualties: { min: 5, max: 20, avg: 10 },
+        damaged: { min: 50, max: 200, avg: 100 },
+        cost: { min: 500000, max: 2000000, avg: 1000000 },
+        wind: { min: 120, max: 150, avg: 135 },
+        rainfall: { min: 300, max: 400, avg: 350 },
+        pressure: { min: 970, max: 980, avg: 975 },
+      },
+    };
+  };
+
+  const getSinglePredictionChartData = () => {
+    if (!result) return null;
+
+    const ranges = getClusterRanges();
+    const clusterRange = ranges[result.cluster as 0 | 1 | 2];
+
+    const casualties = parseFloat(formData.dead) + parseFloat(formData.injured_ill) + parseFloat(formData.missing);
+    const damaged = parseFloat(formData.totally_damaged) + parseFloat(formData.partially_damaged);
+    const cost = parseFloat(formData.cost);
+    const wind = parseFloat(formData.max_sustained_wind);
+    const rainfall = parseFloat(formData.max_24hr_rainfall) + parseFloat(formData.total_storm_rainfall);
+    const pressure = parseFloat(formData.min_pressure);
+
+    // Casualty comparison data
+    const casualtyComparisonData = [
+      { name: "Your Input", value: casualties, fill: "#8b5cf6" },
+      { name: "Cluster Avg", value: clusterRange.casualties.avg, fill: "#d1d5db" },
+    ];
+
+    // Damage comparison data
+    const damageComparisonData = [
+      { 
+        name: "Your Input", 
+        damaged: damaged, 
+        cost: Math.round(cost / 1000000),
+      },
+      { 
+        name: "Cluster Avg", 
+        damaged: clusterRange.damaged.avg, 
+        cost: Math.round(clusterRange.cost.avg / 1000000),
+      },
+    ];
+
+    // Weather comparison data
+    const weatherComparisonData = [
+      {
+        name: "Your Input",
+        wind: wind,
+        rainfall: rainfall,
+        pressure: pressure,
+      },
+      {
+        name: "Cluster Avg",
+        wind: clusterRange.wind.avg,
+        rainfall: clusterRange.rainfall.avg,
+        pressure: clusterRange.pressure.avg,
+      },
+    ];
+
+    // Range chart data for all three impact levels
+    const impactComparisonData = [
+      {
+        category: "Casualties",
+        "Your Input": casualties,
+        "Low Impact": ranges[0].casualties.avg,
+        "Moderate Impact": ranges[2].casualties.avg,
+        "High Impact": ranges[1].casualties.avg,
+      },
+      {
+        category: "Houses Damaged",
+        "Your Input": damaged,
+        "Low Impact": ranges[0].damaged.avg,
+        "Moderate Impact": ranges[2].damaged.avg,
+        "High Impact": ranges[1].damaged.avg,
+      },
+      {
+        category: "Wind (kph)",
+        "Your Input": wind,
+        "Low Impact": ranges[0].wind.avg,
+        "Moderate Impact": ranges[2].wind.avg,
+        "High Impact": ranges[1].wind.avg,
+      },
+    ];
+
+    return {
+      casualtyComparisonData,
+      damageComparisonData,
+      weatherComparisonData,
+      impactComparisonData,
+    };
+  };
+
   const clearBulkData = () => {
     setBulkData([]);
     setBulkResults([]);
@@ -735,6 +862,125 @@ export default function ClusterPage() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Predictions");
     XLSX.writeFile(workbook, `cluster_predictions_${Date.now()}.xlsx`);
+  };
+
+  // Calculate statistics for visualizations
+  const calculateStats = useCallback(() => {
+    if (bulkResults.length === 0) return null;
+
+    const clusterCounts = { 0: 0, 1: 0, 2: 0 };
+    const clusterData = {
+      0: { casualties: 0, damaged: 0, cost: 0, wind: 0, rainfall: 0, pressure: 0, count: 0 },
+      1: { casualties: 0, damaged: 0, cost: 0, wind: 0, rainfall: 0, pressure: 0, count: 0 },
+      2: { casualties: 0, damaged: 0, cost: 0, wind: 0, rainfall: 0, pressure: 0, count: 0 },
+    };
+
+    bulkResults.forEach((row) => {
+      const cluster = row.cluster!;
+      if (cluster >= 0 && cluster <= 2) {
+        clusterCounts[cluster as 0 | 1 | 2]++;
+        const data = clusterData[cluster as 0 | 1 | 2];
+        data.casualties += (row.dead + row.injured_ill + row.missing);
+        data.damaged += (row.totally_damaged + row.partially_damaged);
+        data.cost += row.cost;
+        data.wind += row.max_sustained_wind;
+        data.rainfall += (row.max_24hr_rainfall + row.total_storm_rainfall);
+        data.pressure += row.min_pressure;
+        data.count++;
+      }
+    });
+
+    // Calculate averages
+    Object.keys(clusterData).forEach((key) => {
+      const cluster = parseInt(key) as 0 | 1 | 2;
+      const data = clusterData[cluster];
+      if (data.count > 0) {
+        data.wind = data.wind / data.count;
+        data.rainfall = data.rainfall / data.count;
+        data.pressure = data.pressure / data.count;
+      }
+    });
+
+    return { clusterCounts, clusterData };
+  }, [bulkResults]);
+
+  const stats = useMemo(() => calculateStats(), [calculateStats]);
+
+  const getChartData = () => {
+    if (!stats) return { pieData: [], casualtyData: [], damageData: [], weatherData: [] };
+
+    const { clusterCounts, clusterData } = stats;
+
+    const pieData = [
+      { name: "Low Impact", value: clusterCounts[0], color: "#10b981" },
+      { name: "High Impact", value: clusterCounts[1], color: "#ef4444" },
+      { name: "Moderate Impact", value: clusterCounts[2], color: "#f97316" },
+    ];
+
+    const casualtyData = [
+      {
+        name: "Low Impact",
+        casualties: Math.round(clusterData[0].casualties),
+        color: "#10b981",
+      },
+      {
+        name: "High Impact",
+        casualties: Math.round(clusterData[1].casualties),
+        color: "#ef4444",
+      },
+      {
+        name: "Moderate Impact",
+        casualties: Math.round(clusterData[2].casualties),
+        color: "#f97316",
+      },
+    ];
+
+    const damageData = [
+      {
+        name: "Low Impact",
+        damaged: Math.round(clusterData[0].damaged),
+        cost: Math.round(clusterData[0].cost / 1000000), // Convert to millions
+        color: "#10b981",
+      },
+      {
+        name: "High Impact",
+        damaged: Math.round(clusterData[1].damaged),
+        cost: Math.round(clusterData[1].cost / 1000000),
+        color: "#ef4444",
+      },
+      {
+        name: "Moderate Impact",
+        damaged: Math.round(clusterData[2].damaged),
+        cost: Math.round(clusterData[2].cost / 1000000),
+        color: "#f97316",
+      },
+    ];
+
+    const weatherData = [
+      {
+        name: "Low Impact",
+        wind: Math.round(clusterData[0].wind),
+        rainfall: Math.round(clusterData[0].rainfall),
+        pressure: Math.round(clusterData[0].pressure),
+        color: "#10b981",
+      },
+      {
+        name: "High Impact",
+        wind: Math.round(clusterData[1].wind),
+        rainfall: Math.round(clusterData[1].rainfall),
+        pressure: Math.round(clusterData[1].pressure),
+        color: "#ef4444",
+      },
+      {
+        name: "Moderate Impact",
+        wind: Math.round(clusterData[2].wind),
+        rainfall: Math.round(clusterData[2].rainfall),
+        pressure: Math.round(clusterData[2].pressure),
+        color: "#f97316",
+      },
+    ];
+
+    return { pieData, casualtyData, damageData, weatherData };
   };
 
   return (
@@ -1167,6 +1413,125 @@ export default function ClusterPage() {
                         </h3>
                       </div>
                     </div>
+
+                    {/* Single Prediction Charts */}
+                    {(() => {
+                      const chartData = getSinglePredictionChartData();
+                      if (!chartData) return null;
+
+                      const { casualtyComparisonData, damageComparisonData, weatherComparisonData, impactComparisonData } = chartData;
+
+                      return (
+                        <div className="space-y-8">
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-4">
+                              Impact Comparison Across All Levels
+                            </h4>
+                            <ResponsiveContainer width="100%" height={300}>
+                              <BarChart data={impactComparisonData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="category" />
+                                <YAxis />
+                                <Tooltip />
+                                <Legend />
+                                <Bar dataKey="Your Input" fill="#8b5cf6" />
+                                <Bar dataKey="Low Impact" fill="#10b981" />
+                                <Bar dataKey="Moderate Impact" fill="#f97316" />
+                                <Bar dataKey="High Impact" fill="#ef4444" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                            <p className="text-xs text-gray-500 mt-2 text-center">
+                              Your input compared to typical values for each impact level
+                            </p>
+                          </div>
+
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-4">
+                              Your Input vs. {getClusterLabel(result.cluster)} Average - Casualties
+                            </h4>
+                            <ResponsiveContainer width="100%" height={250}>
+                              <BarChart data={casualtyComparisonData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" />
+                                <YAxis />
+                                <Tooltip />
+                                <Legend />
+                                <Bar dataKey="value" name="Total Casualties (Dead + Injured + Missing)" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-4">
+                              Your Input vs. {getClusterLabel(result.cluster)} Average - Property Damage & Cost
+                            </h4>
+                            <ResponsiveContainer width="100%" height={250}>
+                              <BarChart data={damageComparisonData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" />
+                                <YAxis yAxisId="left" orientation="left" />
+                                <YAxis yAxisId="right" orientation="right" />
+                                <Tooltip />
+                                <Legend />
+                                <Bar
+                                  yAxisId="left"
+                                  dataKey="damaged"
+                                  name="Houses Damaged"
+                                  fill="#3b82f6"
+                                />
+                                <Bar
+                                  yAxisId="right"
+                                  dataKey="cost"
+                                  name="Relief Cost (Million PHP)"
+                                  fill="#f59e0b"
+                                />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-4">
+                              Your Input vs. {getClusterLabel(result.cluster)} Average - Weather Metrics
+                            </h4>
+                            <ResponsiveContainer width="100%" height={250}>
+                              <LineChart data={weatherComparisonData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" />
+                                <YAxis yAxisId="left" />
+                                <YAxis yAxisId="right" orientation="right" />
+                                <Tooltip />
+                                <Legend />
+                                <Line
+                                  yAxisId="left"
+                                  type="monotone"
+                                  dataKey="wind"
+                                  stroke="#06b6d4"
+                                  strokeWidth={2}
+                                  name="Wind Speed (kph)"
+                                />
+                                <Line
+                                  yAxisId="left"
+                                  type="monotone"
+                                  dataKey="rainfall"
+                                  stroke="#10b981"
+                                  strokeWidth={2}
+                                  name="Rainfall (mm)"
+                                />
+                                <Line
+                                  yAxisId="right"
+                                  type="monotone"
+                                  dataKey="pressure"
+                                  stroke="#8b5cf6"
+                                  strokeWidth={2}
+                                  name="Pressure (hPa)"
+                                />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     <div>
                       <h4 className="text-sm font-medium text-gray-500 uppercase mb-3">
                         Description
@@ -1394,6 +1759,133 @@ export default function ClusterPage() {
                 )}
               </div>
             </div>
+
+            {/* Charts Section - NEW */}
+            {bulkResults.length > 0 && (() => {
+              const { pieData, casualtyData, damageData, weatherData } = getChartData();
+              return (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-6">
+                    Impact Profile Visualization
+                  </h3>
+
+                  {/* Distribution Pie Chart */}
+                  <div className="mb-8">
+                    <h4 className="text-sm font-medium text-gray-700 mb-4">
+                      Impact Level Distribution
+                    </h4>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={(entry: any) =>
+                            `${entry.name}: ${((entry.percent || 0) * 100).toFixed(0)}%`
+                          }
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {pieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Casualties Bar Chart */}
+                  <div className="mb-8">
+                    <h4 className="text-sm font-medium text-gray-700 mb-4">
+                      Total Casualties by Impact Level
+                    </h4>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={casualtyData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="casualties" name="Total Casualties" fill="#8b5cf6" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Property Damage Bar Chart */}
+                  <div className="mb-8">
+                    <h4 className="text-sm font-medium text-gray-700 mb-4">
+                      Property Damage & Relief Cost by Impact Level
+                    </h4>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={damageData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis yAxisId="left" orientation="left" />
+                        <YAxis yAxisId="right" orientation="right" />
+                        <Tooltip />
+                        <Legend />
+                        <Bar
+                          yAxisId="left"
+                          dataKey="damaged"
+                          name="Houses Damaged"
+                          fill="#3b82f6"
+                        />
+                        <Bar
+                          yAxisId="right"
+                          dataKey="cost"
+                          name="Relief Cost (Million PHP)"
+                          fill="#f59e0b"
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Weather Data Line Chart */}
+                  <div className="mb-8">
+                    <h4 className="text-sm font-medium text-gray-700 mb-4">
+                      Average Weather Metrics by Impact Level
+                    </h4>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={weatherData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis yAxisId="left" />
+                        <YAxis yAxisId="right" orientation="right" />
+                        <Tooltip />
+                        <Legend />
+                        <Line
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="wind"
+                          stroke="#06b6d4"
+                          strokeWidth={2}
+                          name="Wind Speed (kph)"
+                        />
+                        <Line
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="rainfall"
+                          stroke="#10b981"
+                          strokeWidth={2}
+                          name="Rainfall (mm)"
+                        />
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="pressure"
+                          stroke="#8b5cf6"
+                          strokeWidth={2}
+                          name="Pressure (hPa)"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Data Preview */}
             {bulkData.length > 0 && (
