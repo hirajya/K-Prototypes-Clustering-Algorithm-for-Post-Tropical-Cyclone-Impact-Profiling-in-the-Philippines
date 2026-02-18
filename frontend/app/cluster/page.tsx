@@ -344,6 +344,10 @@ export default function ClusterPage() {
 
         if (jsonData.length === 0) {
           setBulkError("The uploaded file is empty");
+          setBulkData([]);
+          setBulkResults([]);
+          setBulkValidationErrors([]);
+          setMissingColumns([]);
           return;
         }
 
@@ -407,6 +411,10 @@ export default function ClusterPage() {
         if (missing.length > 0) {
           setMissingColumns(missing);
           setBulkError(`Missing required columns: ${missing.join(', ')}`);
+          // Clear previous data when columns are missing
+          setBulkData([]);
+          setBulkResults([]);
+          setBulkValidationErrors([]);
           return;
         }
 
@@ -455,6 +463,11 @@ export default function ClusterPage() {
         }
       } catch (err) {
         setBulkError("Failed to parse file. Please check the format.");
+        // Clear all data on parse error
+        setBulkData([]);
+        setBulkResults([]);
+        setBulkValidationErrors([]);
+        setMissingColumns([]);
         console.error(err);
       }
     };
