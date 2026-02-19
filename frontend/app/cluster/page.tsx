@@ -1025,7 +1025,7 @@ export default function ClusterPage() {
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
               }`}
             >
-              Single Prediction
+              Instance Prediction
             </button>
             <button
               onClick={() => {
@@ -1039,7 +1039,7 @@ export default function ClusterPage() {
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
               }`}
             >
-              Bulk Prediction
+              Batch Prediction
             </button>
           </div>
         </div>

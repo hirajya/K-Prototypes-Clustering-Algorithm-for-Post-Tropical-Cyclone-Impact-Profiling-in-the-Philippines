@@ -701,7 +701,7 @@ export default function PhilippinesWeatherStationPage() {
         href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
       />
 
-      <div style={{ position: "relative", width: "100%", height: "100vh", fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+      <div style={{ position: "relative", width: "100%", height: "95vh", fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
 
         {/* ── Map (full screen) ── */}
         <WeatherMap onStationClick={handleStationClick} />
@@ -947,7 +947,7 @@ export default function PhilippinesWeatherStationPage() {
         {/* ── Legend – Bottom Left ── */}
         <div style={{
           position: "absolute",
-          bottom: 28,
+          bottom: 70,
           left: 12,
           zIndex: 1000,
           background: "rgba(255,255,255,0.95)",
