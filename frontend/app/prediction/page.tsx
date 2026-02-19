@@ -331,8 +331,8 @@ export default function PredictionPage() {
             </div>
           </div>
         </div>
-
-        <div className="flex gap-2 mb-8 bg-white rounded-xl border border-gray-200 p-1 w-fit">
+        
+        <div className="flex gap-2 mb-8 bg-white rounded-xl border border-gray-200 p-1 w-fit mx-auto">
           <button
             onClick={() => setActiveTab('instance')}
             className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
