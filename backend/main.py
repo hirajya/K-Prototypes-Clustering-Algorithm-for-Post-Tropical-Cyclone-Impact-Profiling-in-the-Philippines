@@ -61,6 +61,7 @@ class ForecastInput(BaseModel):
     total_storm_rainfall: float = Field(..., description="Total storm rainfall in mm")
     min_pressure: float = Field(..., description="Minimum pressure in hPa")
     duration: float = Field(..., description="Duration in hours")
+    region: Optional[int] = Field(1, description="Region number (1-17), used for severity classification")
 
 class ForecastResponse(BaseModel):
     """Response containing predictions for all impact categories"""
@@ -68,10 +69,14 @@ class ForecastResponse(BaseModel):
     persons: float
     barangays: float
     dead: float
-    injured: float 
+    injured: float
     missing: float
     totally_damaged: float
     partially_damaged: float
+    # Severity from clustering pipeline
+    severity_cluster: int
+    severity_label: str
+    severity_description: str
     message: str
 
 class HealthResponse(BaseModel):
@@ -182,6 +187,76 @@ def predict_target(target_name: str, assets: dict, weather_data: dict) -> int:
     except Exception as e:
         print(f"   ⚠️ Error predicting '{target_name}': {e}")
         return 0
+    
+def run_clustering_pipeline(
+    families: float, persons: float, dead: float,
+    injured: float, missing: float, totally: float,
+    partially: float, cost: float, duration: float,
+    max_sustained_wind: float, typhoon_type: int,
+    max_24hr_rainfall: float, total_storm_rainfall: float,
+    min_pressure: float, region: int = 1
+) -> dict:
+    """
+    Shared clustering logic used by both /cluster and /predict.
+    Builds the exact same feature vector, applies the same scaler,
+    and runs the same clustering model.
+    """
+    if not models.get('clustering') or models.get('scaler') is None or models.get('feature_columns') is None:
+        raise HTTPException(status_code=503, detail="Clustering model not loaded.")
+
+    # One-hot encode region (same as /cluster)
+    region_columns = {f'region_{i}': 0 for i in range(1, 18)}
+    if 1 <= region <= 17:
+        region_columns[f'region_{region}'] = 1
+
+    # Build feature dict (exact same keys as /cluster)
+    feature_dict = {
+        'families':                families,
+        'person':                  persons,
+        'dead':                    dead,
+        'injured/ill':             injured,
+        'missing':                 missing,
+        'totally':                 totally,
+        'partially':               partially,
+        'cost':                    cost,
+        'duration_in_par_hours':   duration,
+        'max_sustained_wind_kph':  max_sustained_wind,
+        'typhoon_type':            typhoon_type,
+        'max_24hr_rainfall_mm':    max_24hr_rainfall,
+        'total_storm_rainfall_mm': total_storm_rainfall,
+        'min_pressure_hpa':        min_pressure,
+    }
+    feature_dict.update(region_columns)
+
+    feature_df = pd.DataFrame([feature_dict])
+
+    # Align to trained feature columns (exact same as /cluster)
+    for col in models['feature_columns']:
+        if col not in feature_df.columns:
+            feature_df[col] = 0
+    feature_df = feature_df[models['feature_columns']]
+
+    # Scale and predict (exact same as /cluster)
+    scaled_features = models['scaler'].transform(feature_df.values)
+    cluster = int(models['clustering'].predict(scaled_features)[0])
+
+    descriptions = {
+        0: "Lower severity events with minimal casualties and limited property damage requiring standard response protocols.",
+        1: "Severe events with significant casualties, extensive property damage, and large affected populations requiring immediate response.",
+        2: "Moderate severity events with noticeable damage concentrated in specific regions requiring coordinated response."
+    }
+
+    labels = {
+        0: "Low Severity",
+        1: "High Severity",
+        2: "Moderate Severity"
+    }
+
+    return {
+        "cluster":     cluster,
+        "label":       labels.get(cluster, f"Cluster {cluster}"),
+        "description": descriptions.get(cluster, f"Cluster {cluster}")
+    }
     
 # Load models at startup
 @app.on_event("startup")
@@ -437,32 +512,58 @@ Impacts generally last **around 4–6 days**, with prolonged events extending lo
 @app.post("/predict", response_model=ForecastResponse, tags=["Prediction"])
 async def predict_damage(input_data: ForecastInput):
     """
-    Main Endpoint: Predicts ALL targets at once.
+    Two-stage pipeline:
+
+    Stage 1 — Predict casualties from weather data.
+    Stage 2 — Feed those predicted casualties + weather into the
+               clustering model to determine impact severity level.
+
+    Returns casualties AND severity in one response.
     """
-    # 1. Validation
     if not models.get('prediction'):
-        raise HTTPException(status_code=503, detail="Prediction models not loaded")
+        raise HTTPException(status_code=503, detail="Prediction models not loaded.")
 
     try:
-        # 2. Prepare Data
+        # ── Stage 1: Predict casualties from weather ─────────────────────────
         weather_features = get_weather_features(input_data)
-        
-        # 3. Run Predictions Loop (Predicts all of it at once)
+
         results = {}
         for target, assets in models['prediction'].items():
             results[target] = predict_target(target, assets, weather_features)
 
-        # 4. Construct Response
+        # ── Stage 2: Feed predicted casualties + weather into clustering ──────
+        severity = run_clustering_pipeline(
+            families=           results.get('families', 0),
+            persons=            results.get('person', 0),
+            dead=               results.get('dead', 0),
+            injured=            results.get('injured', 0),
+            missing=            results.get('missing', 0),
+            totally=            results.get('totally', 0),
+            partially=          results.get('partially', 0),
+            cost=               0.0,                          # not predicted, default to 0
+            duration=           input_data.duration,
+            max_sustained_wind= input_data.max_sustained_wind,
+            typhoon_type=       input_data.typhoon_type or 0,
+            max_24hr_rainfall=  input_data.max_24hr_rainfall,
+            total_storm_rainfall=input_data.total_storm_rainfall,
+            min_pressure=       input_data.min_pressure,
+            region=             input_data.region or 1
+        )
+
+        # ── Build final response ──────────────────────────────────────────────
         return {
-            "families": results.get('families', 0),
-            "persons": results.get('person', 0),
-            "barangays": results.get('brgy', 0),
-            "dead": results.get('dead', 0),
-            "injured": results.get('injured', 0),
-            "missing": results.get('missing', 0),
-            "totally_damaged": results.get('totally', 0),
-            "partially_damaged": results.get('partially', 0),
-            "message": "Prediction successful"
+            "families":            results.get('families', 0),
+            "persons":             results.get('person', 0),
+            "barangays":           results.get('brgy', 0),
+            "dead":                results.get('dead', 0),
+            "injured":             results.get('injured', 0),
+            "missing":             results.get('missing', 0),
+            "totally_damaged":     results.get('totally', 0),
+            "partially_damaged":   results.get('partially', 0),
+            "severity_cluster":    severity['cluster'],
+            "severity_label":      severity['label'],
+            "severity_description":severity['description'],
+            "message": f"Prediction successful. Impact severity: {severity['label']} (Cluster {severity['cluster']})."
         }
 
     except Exception as e:
