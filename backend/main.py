@@ -544,7 +544,7 @@ async def predict_damage(input_data: ForecastInput):
             "severity_cluster":     severity['cluster'],
             "severity_label":       severity['label'],
             "severity_description": severity['description'],
-            "message": f"Prediction successful. Impact severity: {severity['label']} (Cluster {severity['cluster']})."
+            "message": f"Prediction successful."
         }
 
     except Exception as e:

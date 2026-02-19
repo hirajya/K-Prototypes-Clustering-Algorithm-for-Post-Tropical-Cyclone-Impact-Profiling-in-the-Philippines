@@ -302,6 +302,19 @@ export default function PredictionPage() {
     URL.revokeObjectURL(url)
   }
 
+  const downloadTemplate = () => {
+    const headers = ['max_sustained_wind', 'max_24hr_rainfall', 'total_storm_rainfall', 'min_pressure', 'duration']
+    const exampleRow = ['150', '100', '200', '970', '24']
+    const csv = [headers.join(','), exampleRow.join(',')].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'prediction_template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const handleBulkReset = () => {
     setBulkRows([])
     setBulkError('')
@@ -320,31 +333,37 @@ export default function PredictionPage() {
           </p>
         </div>
 
-        <div className="mb-8 bg-amber-50 border border-amber-200 rounded-2xl p-6">
+        {/* Disclaimer — amber style matching screenshot */}
+        <div className="mb-8 bg-amber-50 rounded-2xl p-6 border border-amber-200">
           <div className="flex items-start gap-3">
-            <span className="text-amber-500 text-xl mt-0.5">⚠</span>
+            <span className="text-amber-500 text-lg mt-0.5">⚠</span>
             <div>
-              <h3 className="font-semibold text-amber-900 mb-1">Data Scope & Limitations</h3>
+              <h3 className="font-semibold text-amber-900 mb-1">Data Scope &amp; Limitations</h3>
               <p className="text-amber-800 text-sm leading-relaxed">
-                This model is trained on historical data from 2020–2024 covering Regions 2, 3, 5, and 8 in the Philippines. Impact predictions may vary significantly based on the specific region and local geographical characteristics of the affected area. Results should be interpreted within the context of the municipality-level scope and regional differences in vulnerability, infrastructure, and preparedness.
+                This model is trained on historical data from <strong className="font-semibold">2020–2024</strong> covering <strong className="font-semibold">Regions 2, 3, 5, and 8</strong> in the Philippines. Impact predictions may vary significantly based on the <strong className="font-semibold">specific region and local geographical characteristics</strong> of the affected area. Results should be interpreted within the context of the municipality-level scope and regional differences in vulnerability, infrastructure, and preparedness.
               </p>
             </div>
           </div>
         </div>
-        
-        <div className="flex gap-2 mb-8 bg-white rounded-xl border border-gray-200 p-1 w-fit mx-auto">
+
+        {/* Tabs — centered, styled like clustering's button approach */}
+        <div className="flex justify-center gap-4 mb-8">
           <button
             onClick={() => setActiveTab('instance')}
-            className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-              activeTab === 'instance' ? 'bg-cyan-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            className={`px-6 py-3 font-semibold rounded-lg transition-colors ${
+              activeTab === 'instance'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
             Instance Prediction
           </button>
           <button
             onClick={() => setActiveTab('batch')}
-            className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-              activeTab === 'batch' ? 'bg-cyan-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            className={`px-6 py-3 font-semibold rounded-lg transition-colors ${
+              activeTab === 'batch'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
             Batch Prediction (CSV)
@@ -365,7 +384,7 @@ export default function PredictionPage() {
                       <input
                         type="number" name="max_sustained_wind" value={formData.max_sustained_wind}
                         onChange={handleInputChange} min="60" max="500" step="1"
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-cyan-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.max_sustained_wind ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.max_sustained_wind ? 'border-red-500' : 'border-gray-300'}`}
                         required
                       />
                       {validationErrors.max_sustained_wind && <p className="text-red-500 text-xs mt-1">{validationErrors.max_sustained_wind}</p>}
@@ -373,7 +392,7 @@ export default function PredictionPage() {
 
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Typhoon Classification</label>
-                      <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">{typhoonClassification.label}</div>
+                      <div className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">{typhoonClassification.label}</div>
                       <p className="text-xs text-gray-500 mt-1">Auto-detected based on max sustained wind</p>
                     </div>
 
@@ -382,7 +401,7 @@ export default function PredictionPage() {
                       <input
                         type="number" name="max_24hr_rainfall" value={formData.max_24hr_rainfall}
                         onChange={handleInputChange} min="0" step="0.1"
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-cyan-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.max_24hr_rainfall ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.max_24hr_rainfall ? 'border-red-500' : 'border-gray-300'}`}
                         required
                       />
                       {validationErrors.max_24hr_rainfall && <p className="text-red-500 text-xs mt-1">{validationErrors.max_24hr_rainfall}</p>}
@@ -393,7 +412,7 @@ export default function PredictionPage() {
                       <input
                         type="number" name="total_storm_rainfall" value={formData.total_storm_rainfall}
                         onChange={handleInputChange} min="0" step="0.1"
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-cyan-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.total_storm_rainfall ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.total_storm_rainfall ? 'border-red-500' : 'border-gray-300'}`}
                         required
                       />
                       {validationErrors.total_storm_rainfall && <p className="text-red-500 text-xs mt-1">{validationErrors.total_storm_rainfall}</p>}
@@ -404,7 +423,7 @@ export default function PredictionPage() {
                       <input
                         type="number" name="min_pressure" value={formData.min_pressure}
                         onChange={handleInputChange} min="870" max="1100" step="0.1"
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-cyan-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.min_pressure ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.min_pressure ? 'border-red-500' : 'border-gray-300'}`}
                         required
                       />
                       {validationErrors.min_pressure && <p className="text-red-500 text-xs mt-1">{validationErrors.min_pressure}</p>}
@@ -415,7 +434,7 @@ export default function PredictionPage() {
                       <input
                         type="number" name="duration" value={formData.duration}
                         onChange={handleInputChange} min="0" step="0.1"
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-cyan-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.duration ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.duration ? 'border-red-500' : 'border-gray-300'}`}
                       />
                       {validationErrors.duration && <p className="text-red-500 text-xs mt-1">{validationErrors.duration}</p>}
                     </div>
@@ -434,7 +453,7 @@ export default function PredictionPage() {
                     <button
                       type="submit"
                       disabled={loading || Object.keys(validationErrors).length > 0}
-                      className={`flex-1 px-6 py-3 font-semibold rounded-lg transition-colors ${loading || Object.keys(validationErrors).length > 0 ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                      className={`flex-1 px-6 py-3 font-semibold rounded-lg transition-colors ${loading || Object.keys(validationErrors).length > 0 ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                     >
                       {loading ? 'Processing...' : 'Predict Damage'}
                     </button>
@@ -595,35 +614,55 @@ export default function PredictionPage() {
           <div className="space-y-6">
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">Batch Prediction via CSV</h2>
-              <p className="text-sm text-gray-500 mb-6">Upload a CSV file with up to 100 rows. Each row will be predicted individually.</p>
+              {/* Header row: title + Download Template button */}
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">Bulk Prediction</h2>
+                <button
+                  onClick={downloadTemplate}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 bg-white text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download Template
+                </button>
+              </div>
 
-              <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-6">
-                <p className="text-xs font-semibold text-gray-700 mb-2">Required CSV Columns:</p>
-                <div className="flex flex-wrap gap-2">
-                  {['max_sustained_wind', 'max_24hr_rainfall', 'total_storm_rainfall', 'min_pressure', 'duration'].map(col => (
-                    <span key={col} className="text-xs bg-cyan-100 text-cyan-800 px-2 py-1 rounded font-mono">{col}</span>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-500 mt-3">
-                  Example row: <span className="font-mono">150,100,200,970,24</span>
+              {/* Dashed dropzone */}
+              <label
+                htmlFor="csv-upload"
+                className="flex flex-col items-center justify-center w-full h-44 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors mb-6"
+              >
+                <svg className="w-10 h-10 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <p className="text-sm font-medium text-gray-700 mb-1">Click to upload Excel/CSV file</p>
+                <p className="text-xs text-gray-400">Supports .xlsx, .xls, .csv</p>
+                <input
+                  id="csv-upload"
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+
+              {/* Required Columns blue box */}
+              <div className="bg-blue-50 rounded-xl border border-blue-100 p-4">
+                <p className="text-sm font-semibold text-blue-900 mb-2">Required Columns:</p>
+                <p className="text-sm text-blue-700 leading-relaxed">
+                  max_sustained_wind, max_24hr_rainfall, total_storm_rainfall, min_pressure, duration
                 </p>
               </div>
 
-              <div className="flex gap-4 items-center">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileUpload}
-                  className="block w-full text-sm text-gray-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 file:cursor-pointer cursor-pointer"
-                />
-                {bulkRows.length > 0 && (
-                  <button onClick={handleBulkReset} className="shrink-0 px-4 py-2.5 bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-300 transition-colors">
+              {bulkRows.length > 0 && !bulkLoading && (
+                <div className="flex justify-end mt-4">
+                  <button onClick={handleBulkReset} className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-300 transition-colors">
                     Clear
                   </button>
-                )}
-              </div>
+                </div>
+              )}
 
               {bulkError && (
                 <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -638,7 +677,7 @@ export default function PredictionPage() {
                     <span>{bulkProgress}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-cyan-600 h-2 rounded-full transition-all duration-300" style={{ width: `${bulkProgress}%` }} />
+                    <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{ width: `${bulkProgress}%` }} />
                   </div>
                 </div>
               )}
@@ -653,7 +692,7 @@ export default function PredictionPage() {
                   </div>
                   <button
                     onClick={downloadCSV}
-                    className="px-5 py-2.5 bg-cyan-600 text-white text-sm font-semibold rounded-lg hover:bg-cyan-700 transition-colors flex items-center gap-2"
+                    className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -712,38 +751,6 @@ export default function PredictionPage() {
             )}
           </div>
         )}
-
-        <div className="mt-8 bg-gray-50 rounded-2xl p-6 border border-gray-200">
-          <h3 className="font-semibold text-gray-900 mb-3">(TC) Tropical Cyclone Classification</h3>
-          <p className="text-gray-600 text-sm mb-4">Auto-detected based on max sustained wind:</p>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs text-gray-600">
-            <div className="bg-white rounded-lg p-3 border border-gray-200">
-              <div className="font-semibold text-gray-800 mb-1">TD</div>
-              Tropical Depression
-              <div className="text-gray-400 mt-1">≤61 km/h</div>
-            </div>
-            <div className="bg-white rounded-lg p-3 border border-gray-200">
-              <div className="font-semibold text-gray-800 mb-1">TS</div>
-              Tropical Storm
-              <div className="text-gray-400 mt-1">62–88 km/h</div>
-            </div>
-            <div className="bg-white rounded-lg p-3 border border-gray-200">
-              <div className="font-semibold text-gray-800 mb-1">STS</div>
-              Severe Tropical Storm
-              <div className="text-gray-400 mt-1">89–117 km/h</div>
-            </div>
-            <div className="bg-white rounded-lg p-3 border border-gray-200">
-              <div className="font-semibold text-gray-800 mb-1">TY</div>
-              Typhoon
-              <div className="text-gray-400 mt-1">118–184 km/h</div>
-            </div>
-            <div className="bg-white rounded-lg p-3 border border-gray-200">
-              <div className="font-semibold text-gray-800 mb-1">STY</div>
-              Super Typhoon
-              <div className="text-gray-400 mt-1">&gt;184 km/h</div>
-            </div>
-          </div>
-        </div>
 
       </div>
     </div>
