@@ -8,10 +8,13 @@ interface ForecastResult {
   persons: number
   barangays: number
   dead: number
-  injured: number // Backend returns 'injured', not 'injured_ill'
+  injured: number
   missing: number
   partially_damaged: number
   totally_damaged: number
+  severity_cluster: number
+  severity_label: string
+  severity_description: string
   message: string
 }
 
@@ -141,7 +144,8 @@ export default function PredictionPage() {
         total_storm_rainfall: parseFloat(formData.total_storm_rainfall) || 0,
         min_pressure: parseFloat(formData.min_pressure) || 0,
         duration: parseFloat(formData.duration) || 0,
-        typhoon_type: typhoonClassification.type, 
+        typhoon_type: typhoonClassification.type,
+        region: 2, // default;
       }
 
       // Use the correct prediction endpoint
@@ -343,10 +347,49 @@ export default function PredictionPage() {
 
               {result ? (
                 <div className="space-y-6">
-                  {/* Display prediction results */}
+
+                  {/* Severity Level Badge */}
+                  <div className={`p-5 rounded-xl border-2 ${
+                    result.severity_cluster === 1
+                      ? 'bg-red-50 border-red-300'
+                      : result.severity_cluster === 2
+                      ? 'bg-orange-50 border-orange-300'
+                      : 'bg-green-50 border-green-300'
+                  }`}>
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                        result.severity_cluster === 1
+                          ? 'bg-red-500 text-white'
+                          : result.severity_cluster === 2
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-green-500 text-white'
+                      }`}>
+                        Cluster {result.severity_cluster}
+                      </span>
+                      <p className={`text-lg font-bold ${
+                        result.severity_cluster === 1
+                          ? 'text-red-800'
+                          : result.severity_cluster === 2
+                          ? 'text-orange-800'
+                          : 'text-green-800'
+                      }`}>
+                        {result.severity_label ?? 'Unknown'}
+                      </p>
+                    </div>
+                    <p className={`text-sm ${
+                      result.severity_cluster === 1
+                        ? 'text-red-700'
+                        : result.severity_cluster === 2
+                        ? 'text-orange-700'
+                        : 'text-green-700'
+                    }`}>
+                      {result.severity_description ?? ''}
+                    </p>
+                  </div>
+
+                  {/* Impact Breakdown */}
                   <div className="space-y-3">
                     <h3 className="font-semibold text-gray-800 text-sm">Estimated Impact Breakdown:</h3>
-                    
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
                         <p className="text-xs text-blue-600 font-medium mb-1">Families Affected</p>

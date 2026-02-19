@@ -511,63 +511,64 @@ Impacts generally last **around 4–6 days**, with prolonged events extending lo
 
 @app.post("/predict", response_model=ForecastResponse, tags=["Prediction"])
 async def predict_damage(input_data: ForecastInput):
-    """
-    Two-stage pipeline:
-
-    Stage 1 — Predict casualties from weather data.
-    Stage 2 — Feed those predicted casualties + weather into the
-               clustering model to determine impact severity level.
-
-    Returns casualties AND severity in one response.
-    """
     if not models.get('prediction'):
         raise HTTPException(status_code=503, detail="Prediction models not loaded.")
 
     try:
-        # ── Stage 1: Predict casualties from weather ─────────────────────────
+        # Stage 1
         weather_features = get_weather_features(input_data)
+        print(f"DEBUG weather_features: {weather_features}")
 
         results = {}
         for target, assets in models['prediction'].items():
             results[target] = predict_target(target, assets, weather_features)
 
-        # ── Stage 2: Feed predicted casualties + weather into clustering ──────
+        print(f"DEBUG Stage 1 results: {results}")
+
+        # Stage 2
+        print(f"DEBUG clustering model loaded: {bool(models.get('clustering'))}")
+        print(f"DEBUG scaler loaded: {models.get('scaler') is not None}")
+        print(f"DEBUG feature_columns loaded: {models.get('feature_columns') is not None}")
+
         severity = run_clustering_pipeline(
-            families=           results.get('families', 0),
-            persons=            results.get('person', 0),
-            dead=               results.get('dead', 0),
-            injured=            results.get('injured', 0),
-            missing=            results.get('missing', 0),
-            totally=            results.get('totally', 0),
-            partially=          results.get('partially', 0),
-            cost=               0.0,                          # not predicted, default to 0
-            duration=           input_data.duration,
-            max_sustained_wind= input_data.max_sustained_wind,
-            typhoon_type=       input_data.typhoon_type or 0,
-            max_24hr_rainfall=  input_data.max_24hr_rainfall,
+            families=            results.get('families', 0),
+            persons=             results.get('person', 0),
+            dead=                results.get('dead', 0),
+            injured=             results.get('injured', 0),
+            missing=             results.get('missing', 0),
+            totally=             results.get('totally', 0),
+            partially=           results.get('partially', 0),
+            cost=                0.0,
+            duration=            input_data.duration,
+            max_sustained_wind=  input_data.max_sustained_wind,
+            typhoon_type=        input_data.typhoon_type or 0,
+            max_24hr_rainfall=   input_data.max_24hr_rainfall,
             total_storm_rainfall=input_data.total_storm_rainfall,
-            min_pressure=       input_data.min_pressure,
-            region=             input_data.region or 1
+            min_pressure=        input_data.min_pressure,
+            region=              input_data.region or 1
         )
 
-        # ── Build final response ──────────────────────────────────────────────
+        print(f"DEBUG severity result: {severity}")
+
         return {
-            "families":            results.get('families', 0),
-            "persons":             results.get('person', 0),
-            "barangays":           results.get('brgy', 0),
-            "dead":                results.get('dead', 0),
-            "injured":             results.get('injured', 0),
-            "missing":             results.get('missing', 0),
-            "totally_damaged":     results.get('totally', 0),
-            "partially_damaged":   results.get('partially', 0),
-            "severity_cluster":    severity['cluster'],
-            "severity_label":      severity['label'],
-            "severity_description":severity['description'],
+            "families":             results.get('families', 0),
+            "persons":              results.get('person', 0),
+            "barangays":            results.get('brgy', 0),
+            "dead":                 results.get('dead', 0),
+            "injured":              results.get('injured', 0),
+            "missing":              results.get('missing', 0),
+            "totally_damaged":      results.get('totally', 0),
+            "partially_damaged":    results.get('partially', 0),
+            "severity_cluster":     severity['cluster'],
+            "severity_label":       severity['label'],
+            "severity_description": severity['description'],
             "message": f"Prediction successful. Impact severity: {severity['label']} (Cluster {severity['cluster']})."
         }
 
     except Exception as e:
-        print(f"Server Error: {e}")
+        print(f"DEBUG ERROR in /predict: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.get("/api/maacli", tags=["MAACLI"])
