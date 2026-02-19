@@ -60,8 +60,6 @@ class ForecastInput(BaseModel):
     total_storm_rainfall: float = Field(..., description="Total storm rainfall in mm")
     min_pressure: float = Field(..., description="Minimum pressure in hPa")
     duration: float = Field(..., description="Duration in hours")
-    region: Optional[int] = Field(1, description="Region number (1-17), used for severity classification")
-    cost: Optional[float] = Field(0.0, description="Estimated damage cost in PHP")
 
 class ForecastResponse(BaseModel):
     families: float
@@ -189,17 +187,15 @@ def predict_target(target_name: str, assets: dict, weather_data: dict) -> int:
 def run_clustering_pipeline(
     families: float, persons: float, dead: float,
     injured: float, missing: float, totally: float,
-    partially: float, cost: float, duration: float,
+    partially: float, duration: float,
     max_sustained_wind: float, typhoon_type: int,
     max_24hr_rainfall: float, total_storm_rainfall: float,
-    min_pressure: float, region: int = 1
+    min_pressure: float
 ) -> dict:
     if not models.get('clustering') or models.get('scaler') is None or models.get('feature_columns') is None:
         raise HTTPException(status_code=503, detail="Clustering model not loaded.")
 
     region_columns = {f'region_{i}': 0 for i in range(1, 18)}
-    if 1 <= region <= 17:
-        region_columns[f'region_{region}'] = 1
 
     feature_dict = {
         'families':                families,
@@ -209,7 +205,7 @@ def run_clustering_pipeline(
         'missing':                 missing,
         'totally':                 totally,
         'partially':               partially,
-        'cost':                    cost,
+        'cost':                    0.0,
         'duration_in_par_hours':   duration,
         'max_sustained_wind_kph':  max_sustained_wind,
         'typhoon_type':            typhoon_type,
@@ -526,14 +522,12 @@ async def predict_damage(input_data: ForecastInput):
             missing=              results.get('missing', 0),
             totally=              results.get('totally', 0),
             partially=            results.get('partially', 0),
-            cost=                 0.0,
             duration=             input_data.duration,
             max_sustained_wind=   input_data.max_sustained_wind,
             typhoon_type=         input_data.typhoon_type or 0,
             max_24hr_rainfall=    input_data.max_24hr_rainfall,
             total_storm_rainfall= input_data.total_storm_rainfall,
             min_pressure=         input_data.min_pressure,
-            region=               input_data.region or 1
         )
 
         print(f"DEBUG severity: {severity}", flush=True)
