@@ -440,7 +440,7 @@ export default function PredictionPage() {
                     {/* Region */}
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Region <span className="text-red-500">*</span>
+                        Region
                       </label>
                       <select
                         name="region"
@@ -456,10 +456,6 @@ export default function PredictionPage() {
                           <option key={r.value} value={r.value}>{r.label}</option>
                         ))}
                       </select>
-                      {validationErrors.region
-                        ? <p className="text-red-500 text-xs mt-1">{validationErrors.region}</p>
-                        : <p className="text-xs text-gray-500 mt-1">Region is the strongest predictor of severity — required for accurate results</p>
-                      }
                     </div>
 
                     {/* Max Sustained Wind */}
@@ -587,9 +583,6 @@ export default function PredictionPage() {
                     <div className="space-y-6">
                       <div className={`p-5 rounded-xl border-2 ${getSeverityBorder(result.severity_cluster)}`}>
                         <div className="flex items-center gap-3 mb-2">
-                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${getSeverityBadge(result.severity_cluster)}`}>
-                            Cluster {result.severity_cluster}
-                          </span>
                           <p className={`text-lg font-bold ${getSeverityText(result.severity_cluster)}`}>
                             {result.severity_label}
                           </p>
