@@ -125,7 +125,9 @@ export default function ClusterPage() {
   const [bulkResults, setBulkResults] = useState<BulkDataRow[]>([]);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkError, setBulkError] = useState("");
-  const [bulkValidationErrors, setBulkValidationErrors] = useState<ValidationError[]>([]);
+  const [bulkValidationErrors, setBulkValidationErrors] = useState<
+    ValidationError[]
+  >([]);
   const [missingColumns, setMissingColumns] = useState<string[]>([]);
 
   // Auto-detect typhoon type based on max sustained wind
@@ -188,7 +190,8 @@ export default function ClusterPage() {
     // Duration validation: must be > 0
     const duration = parseFloat(data.duration_hrs);
     if (!data.duration_hrs || isNaN(duration) || duration <= 0) {
-      errors.duration_hrs = "Duration is required and must be greater than 0 hours";
+      errors.duration_hrs =
+        "Duration is required and must be greater than 0 hours";
     } else if (duration > 720) {
       // 30 days
       errors.duration_hrs =
@@ -198,7 +201,8 @@ export default function ClusterPage() {
     // Pressure validation: must be > 0
     const pressure = parseFloat(data.min_pressure);
     if (!data.min_pressure || isNaN(pressure) || pressure <= 0) {
-      errors.min_pressure = "Min Pressure is required and must be greater than 0 hPa";
+      errors.min_pressure =
+        "Min Pressure is required and must be greater than 0 hPa";
     } else if (pressure < 870 || pressure > 1100) {
       errors.min_pressure =
         "Pressure must be between 870-1100 hPa (typical typhoon range)";
@@ -207,15 +211,21 @@ export default function ClusterPage() {
     // Rainfall validation: must be > 0
     const rainfall24 = parseFloat(data.max_24hr_rainfall);
     if (!data.max_24hr_rainfall || isNaN(rainfall24) || rainfall24 <= 0) {
-      errors.max_24hr_rainfall = "Max 24hr Rainfall is required and must be greater than 0 mm";
+      errors.max_24hr_rainfall =
+        "Max 24hr Rainfall is required and must be greater than 0 mm";
     } else if (rainfall24 > 2000) {
       errors.max_24hr_rainfall =
         "Daily rainfall exceeds world record (1,825mm)";
     }
 
     const rainfallTotal = parseFloat(data.total_storm_rainfall);
-    if (!data.total_storm_rainfall || isNaN(rainfallTotal) || rainfallTotal <= 0) {
-      errors.total_storm_rainfall = "Total Storm Rainfall is required and must be greater than 0 mm";
+    if (
+      !data.total_storm_rainfall ||
+      isNaN(rainfallTotal) ||
+      rainfallTotal <= 0
+    ) {
+      errors.total_storm_rainfall =
+        "Total Storm Rainfall is required and must be greater than 0 mm";
     } else if (rainfallTotal > 5000) {
       errors.total_storm_rainfall = "Total rainfall seems unrealistic";
     }
@@ -368,56 +378,76 @@ export default function ClusterPage() {
 
         // Normalize column name for comparison
         const normalizeColumn = (col: string): string => {
-          return col.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return col.toLowerCase().replace(/[^a-z0-9]/g, "");
         };
 
         // Check for required columns
         const requiredColumns = [
-          'families', 'persons', 'barangays', 'dead', 'injured_ill', 
-          'missing', 'totally_damaged', 'partially_damaged', 'cost', 
-          'duration_hrs', 'max_sustained_wind', 'max_24hr_rainfall', 
-          'total_storm_rainfall', 'min_pressure', 'region'
+          "families",
+          "persons",
+          "barangays",
+          "dead",
+          "injured_ill",
+          "missing",
+          "totally_damaged",
+          "partially_damaged",
+          "cost",
+          "duration_hrs",
+          "max_sustained_wind",
+          "max_24hr_rainfall",
+          "total_storm_rainfall",
+          "min_pressure",
+          "region",
         ];
 
         const firstRow = jsonData[0];
         const actualColumns = Object.keys(firstRow);
         const normalizedActualColumns = actualColumns.map(normalizeColumn);
-        
+
         // Map each required column to possible variations
         const columnMapping: Record<string, string[]> = {
-          'families': ['families'],
-          'persons': ['persons'],
-          'barangays': ['barangays', 'barangaysaffected'],
-          'dead': ['dead'],
-          'injured_ill': ['injuredill', 'injured', 'injuryill'],
-          'missing': ['missing'],
-          'totally_damaged': ['totallydamaged', 'totallydamagehouses'],
-          'partially_damaged': ['partiallydamaged', 'partiallydamagedhouses'],
-          'cost': ['cost', 'costphp'],
-          'duration_hrs': ['durationhrs', 'duration'],
-          'max_sustained_wind': ['maxsustainedwind', 'maxwind', 'wind'],
-          'max_24hr_rainfall': ['max24hrrainfall', 'rainfall24', 'rainfall24hr', '24hrrainfall'],
-          'total_storm_rainfall': ['totalstormrainfall', 'totalrainfall'],
-          'min_pressure': ['minpressure', 'pressure'],
-          'region': ['region']
+          families: ["families"],
+          persons: ["persons"],
+          barangays: ["barangays", "barangaysaffected"],
+          dead: ["dead"],
+          injured_ill: ["injuredill", "injured", "injuryill"],
+          missing: ["missing"],
+          totally_damaged: ["totallydamaged", "totallydamagehouses"],
+          partially_damaged: ["partiallydamaged", "partiallydamagedhouses"],
+          cost: ["cost", "costphp"],
+          duration_hrs: ["durationhrs", "duration"],
+          max_sustained_wind: ["maxsustainedwind", "maxwind", "wind"],
+          max_24hr_rainfall: [
+            "max24hrrainfall",
+            "rainfall24",
+            "rainfall24hr",
+            "24hrrainfall",
+          ],
+          total_storm_rainfall: ["totalstormrainfall", "totalrainfall"],
+          min_pressure: ["minpressure", "pressure"],
+          region: ["region"],
         };
 
         const missing: string[] = [];
         const foundColumns: Record<string, string> = {}; // Map required column to actual column name
-        
-        requiredColumns.forEach(requiredCol => {
-          const variations = columnMapping[requiredCol] || [requiredCol.replace(/_/g, '')];
+
+        requiredColumns.forEach((requiredCol) => {
+          const variations = columnMapping[requiredCol] || [
+            requiredCol.replace(/_/g, ""),
+          ];
           let found = false;
-          
+
           for (const actualCol of actualColumns) {
             const normalizedActual = normalizeColumn(actualCol);
-            if (variations.some(v => normalizedActual === normalizeColumn(v))) {
+            if (
+              variations.some((v) => normalizedActual === normalizeColumn(v))
+            ) {
               foundColumns[requiredCol] = actualCol;
               found = true;
               break;
             }
           }
-          
+
           if (!found) {
             missing.push(requiredCol);
           }
@@ -425,7 +455,7 @@ export default function ClusterPage() {
 
         if (missing.length > 0) {
           setMissingColumns(missing);
-          setBulkError(`Missing required columns: ${missing.join(', ')}`);
+          setBulkError(`Missing required columns: ${missing.join(", ")}`);
           // Clear previous data when columns are missing
           setBulkData([]);
           setBulkResults([]);
@@ -437,21 +467,29 @@ export default function ClusterPage() {
 
         // Map the Excel columns to our expected format using the found column mapping
         const mappedData: BulkDataRow[] = jsonData.map((row, index) => ({
-          families: Number(row[foundColumns['families']] || 0),
-          persons: Number(row[foundColumns['persons']] || 0),
-          barangays: Number(row[foundColumns['barangays']] || 0),
-          dead: Number(row[foundColumns['dead']] || 0),
-          injured_ill: Number(row[foundColumns['injured_ill']] || 0),
-          missing: Number(row[foundColumns['missing']] || 0),
-          totally_damaged: Number(row[foundColumns['totally_damaged']] || 0),
-          partially_damaged: Number(row[foundColumns['partially_damaged']] || 0),
-          cost: Number(row[foundColumns['cost']] || 0),
-          duration_hrs: Number(row[foundColumns['duration_hrs']] || 0),
-          max_sustained_wind: Number(row[foundColumns['max_sustained_wind']] || 0),
-          max_24hr_rainfall: Number(row[foundColumns['max_24hr_rainfall']] || 0),
-          total_storm_rainfall: Number(row[foundColumns['total_storm_rainfall']] || 0),
-          min_pressure: Number(row[foundColumns['min_pressure']] || 0),
-          region: Number(row[foundColumns['region']] || 2),
+          families: Number(row[foundColumns["families"]] || 0),
+          persons: Number(row[foundColumns["persons"]] || 0),
+          barangays: Number(row[foundColumns["barangays"]] || 0),
+          dead: Number(row[foundColumns["dead"]] || 0),
+          injured_ill: Number(row[foundColumns["injured_ill"]] || 0),
+          missing: Number(row[foundColumns["missing"]] || 0),
+          totally_damaged: Number(row[foundColumns["totally_damaged"]] || 0),
+          partially_damaged: Number(
+            row[foundColumns["partially_damaged"]] || 0
+          ),
+          cost: Number(row[foundColumns["cost"]] || 0),
+          duration_hrs: Number(row[foundColumns["duration_hrs"]] || 0),
+          max_sustained_wind: Number(
+            row[foundColumns["max_sustained_wind"]] || 0
+          ),
+          max_24hr_rainfall: Number(
+            row[foundColumns["max_24hr_rainfall"]] || 0
+          ),
+          total_storm_rainfall: Number(
+            row[foundColumns["total_storm_rainfall"]] || 0
+          ),
+          min_pressure: Number(row[foundColumns["min_pressure"]] || 0),
+          region: Number(row[foundColumns["region"]] || 2),
           rowNumber: index + 2, // +2 because Excel is 1-indexed and has header row
         }));
 
@@ -470,9 +508,11 @@ export default function ClusterPage() {
         setBulkValidationErrors(errors);
         setBulkData(mappedData);
         setBulkResults([]);
-        
+
         if (errors.length > 0) {
-          setBulkError(`Found ${errors.length} row(s) with validation errors. Please review below.`);
+          setBulkError(
+            `Found ${errors.length} row(s) with validation errors. Please review below.`
+          );
         } else {
           setBulkError("");
         }
@@ -512,7 +552,7 @@ export default function ClusterPage() {
 
       for (const row of bulkData) {
         const typhoonType = getTyphoonType(row.max_sustained_wind);
-        
+
         const payload = {
           families: row.families,
           persons: row.persons,
@@ -557,7 +597,9 @@ export default function ClusterPage() {
       setBulkResults(results);
     } catch (err) {
       setBulkError(
-        err instanceof Error ? err.message : "Failed to process bulk predictions"
+        err instanceof Error
+          ? err.message
+          : "Failed to process bulk predictions"
       );
     } finally {
       setBulkLoading(false);
@@ -715,7 +757,8 @@ export default function ClusterPage() {
   // Get typical ranges for each cluster based on historical data
   const getClusterRanges = () => {
     return {
-      0: { // Low Impact
+      0: {
+        // Low Impact
         casualties: { min: 0, max: 5, avg: 1 },
         damaged: { min: 0, max: 50, avg: 15 },
         cost: { min: 0, max: 500000, avg: 100000 },
@@ -723,7 +766,8 @@ export default function ClusterPage() {
         rainfall: { min: 50, max: 300, avg: 150 },
         pressure: { min: 980, max: 1010, avg: 995 },
       },
-      1: { // High Impact
+      1: {
+        // High Impact
         casualties: { min: 20, max: 200, avg: 80 },
         damaged: { min: 200, max: 2000, avg: 800 },
         cost: { min: 2000000, max: 50000000, avg: 15000000 },
@@ -731,7 +775,8 @@ export default function ClusterPage() {
         rainfall: { min: 400, max: 1500, avg: 800 },
         pressure: { min: 900, max: 970, avg: 940 },
       },
-      2: { // Moderate Impact
+      2: {
+        // Moderate Impact
         casualties: { min: 5, max: 20, avg: 10 },
         damaged: { min: 50, max: 200, avg: 100 },
         cost: { min: 500000, max: 2000000, avg: 1000000 },
@@ -748,29 +793,40 @@ export default function ClusterPage() {
     const ranges = getClusterRanges();
     const clusterRange = ranges[result.cluster as 0 | 1 | 2];
 
-    const casualties = parseFloat(formData.dead) + parseFloat(formData.injured_ill) + parseFloat(formData.missing);
-    const damaged = parseFloat(formData.totally_damaged) + parseFloat(formData.partially_damaged);
+    const casualties =
+      parseFloat(formData.dead) +
+      parseFloat(formData.injured_ill) +
+      parseFloat(formData.missing);
+    const damaged =
+      parseFloat(formData.totally_damaged) +
+      parseFloat(formData.partially_damaged);
     const cost = parseFloat(formData.cost);
     const wind = parseFloat(formData.max_sustained_wind);
-    const rainfall = parseFloat(formData.max_24hr_rainfall) + parseFloat(formData.total_storm_rainfall);
+    const rainfall =
+      parseFloat(formData.max_24hr_rainfall) +
+      parseFloat(formData.total_storm_rainfall);
     const pressure = parseFloat(formData.min_pressure);
 
     // Casualty comparison data
     const casualtyComparisonData = [
       { name: "Your Input", value: casualties, fill: "#8b5cf6" },
-      { name: "Cluster Avg", value: clusterRange.casualties.avg, fill: "#d1d5db" },
+      {
+        name: "Cluster Avg",
+        value: clusterRange.casualties.avg,
+        fill: "#d1d5db",
+      },
     ];
 
     // Damage comparison data
     const damageComparisonData = [
-      { 
-        name: "Your Input", 
-        damaged: damaged, 
+      {
+        name: "Your Input",
+        damaged: damaged,
         cost: Math.round(cost / 1000000),
       },
-      { 
-        name: "Cluster Avg", 
-        damaged: clusterRange.damaged.avg, 
+      {
+        name: "Cluster Avg",
+        damaged: clusterRange.damaged.avg,
         cost: Math.round(clusterRange.cost.avg / 1000000),
       },
     ];
@@ -870,9 +926,33 @@ export default function ClusterPage() {
 
     const clusterCounts = { 0: 0, 1: 0, 2: 0 };
     const clusterData = {
-      0: { casualties: 0, damaged: 0, cost: 0, wind: 0, rainfall: 0, pressure: 0, count: 0 },
-      1: { casualties: 0, damaged: 0, cost: 0, wind: 0, rainfall: 0, pressure: 0, count: 0 },
-      2: { casualties: 0, damaged: 0, cost: 0, wind: 0, rainfall: 0, pressure: 0, count: 0 },
+      0: {
+        casualties: 0,
+        damaged: 0,
+        cost: 0,
+        wind: 0,
+        rainfall: 0,
+        pressure: 0,
+        count: 0,
+      },
+      1: {
+        casualties: 0,
+        damaged: 0,
+        cost: 0,
+        wind: 0,
+        rainfall: 0,
+        pressure: 0,
+        count: 0,
+      },
+      2: {
+        casualties: 0,
+        damaged: 0,
+        cost: 0,
+        wind: 0,
+        rainfall: 0,
+        pressure: 0,
+        count: 0,
+      },
     };
 
     bulkResults.forEach((row) => {
@@ -880,11 +960,11 @@ export default function ClusterPage() {
       if (cluster >= 0 && cluster <= 2) {
         clusterCounts[cluster as 0 | 1 | 2]++;
         const data = clusterData[cluster as 0 | 1 | 2];
-        data.casualties += (row.dead + row.injured_ill + row.missing);
-        data.damaged += (row.totally_damaged + row.partially_damaged);
+        data.casualties += row.dead + row.injured_ill + row.missing;
+        data.damaged += row.totally_damaged + row.partially_damaged;
         data.cost += row.cost;
         data.wind += row.max_sustained_wind;
-        data.rainfall += (row.max_24hr_rainfall + row.total_storm_rainfall);
+        data.rainfall += row.max_24hr_rainfall + row.total_storm_rainfall;
         data.pressure += row.min_pressure;
         data.count++;
       }
@@ -907,7 +987,8 @@ export default function ClusterPage() {
   const stats = useMemo(() => calculateStats(), [calculateStats]);
 
   const getChartData = () => {
-    if (!stats) return { pieData: [], casualtyData: [], damageData: [], weatherData: [] };
+    if (!stats)
+      return { pieData: [], casualtyData: [], damageData: [], weatherData: [] };
 
     const { clusterCounts, clusterData } = stats;
 
@@ -994,24 +1075,61 @@ export default function ClusterPage() {
             Enter tropical cyclone impact data to identify the municipality
             impact profile
           </p>
-          
+
           {/* Data Disclaimer */}
           <div className="mt-6 max-w-3xl mx-auto bg-amber-50 border border-amber-200 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              <svg
+                className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
               </svg>
               <div className="text-left">
-                <h3 className="text-sm font-semibold text-amber-900 mb-1">Data Scope & Limitations</h3>
+                <h3 className="text-sm font-semibold text-amber-900 mb-1">
+                  Data Scope & Limitations
+                </h3>
                 <p className="text-xs text-amber-800 leading-relaxed">
-                  This model is trained on historical data from <strong>2020-2024</strong> covering <strong>Regions 2, 3, 5, and 8</strong> in the Philippines. 
-                  Impact predictions may vary significantly based on the <strong>specific region and local geographical characteristics</strong> of the affected area. 
-                  Results should be interpreted within the context of the municipality-level scope and regional differences in vulnerability, infrastructure, and preparedness.
+                  The system&rsquo;s predictive outputs are{" "}
+                  <strong>
+                    spatially limited to the catchment areas of reporting
+                    meteorological stations
+                  </strong>
+                  , providing only{" "}
+                  <strong>municipality- or zone-level forecasts</strong>. It
+                  assumes <strong>uniform exposure</strong> within each coverage
+                  area and does not account for{" "}
+                  <strong>micro-topographical differences</strong> such as
+                  coastal, mountainous, or low-lying barangays. Since the model
+                  relies on{" "}
+                  <strong>
+                    station-level data without GIS elevation inputs
+                  </strong>
+                  , localized terrain-specific impacts cannot be assessed.
+                </p>
+
+                <p className="text-xs text-amber-800 leading-relaxed mt-2">
+                  The model is trained on{" "}
+                  <strong>historical data from 2020&ndash;2024</strong> across
+                  selected regions in the Philippines (Regions 2, 3, 5, and 8).
+                  Therefore, predictions may vary depending on{" "}
+                  <strong>
+                    regional geography, vulnerability, infrastructure, and
+                    preparedness
+                  </strong>
+                  . Results should be interpreted within the{" "}
+                  <strong>municipality-level scope and regional context</strong>
+                  .
                 </p>
               </div>
             </div>
           </div>
-          
+
           {/* Mode Toggle */}
           <div className="flex justify-center gap-4 mt-6">
             <button
@@ -1380,7 +1498,9 @@ export default function ClusterPage() {
                 <div className="flex gap-4">
                   <button
                     type="submit"
-                    disabled={loading || Object.keys(validationErrors).length > 0}
+                    disabled={
+                      loading || Object.keys(validationErrors).length > 0
+                    }
                     className={`flex-1 px-6 py-3 font-semibold rounded-lg ${
                       loading || Object.keys(validationErrors).length > 0
                         ? "bg-gray-400 text-gray-200 cursor-not-allowed"
@@ -1411,7 +1531,9 @@ export default function ClusterPage() {
                   <h2 className="text-xl font-semibold text-gray-900 mb-6">
                     Impact Profiling Result
                   </h2>
-                  <p className="text-sm text-gray-600 mb-6">Municipality Level</p>
+                  <p className="text-sm text-gray-600 mb-6">
+                    Municipality Level
+                  </p>
                   <div className="space-y-6">
                     <div
                       className={`p-6 rounded-xl border-2 ${getClusterBgColor(
@@ -1423,8 +1545,7 @@ export default function ClusterPage() {
                           className={`inline-flex items-center justify-center w-20 h-20 rounded-full ${getClusterColor(
                             result.cluster
                           )} text-white text-3xl font-bold mb-4`}
-                        >
-                        </div>
+                        ></div>
                         <h3 className="text-xl font-bold text-gray-900">
                           {getClusterLabel(result.cluster)}
                         </h3>
@@ -1436,7 +1557,12 @@ export default function ClusterPage() {
                       const chartData = getSinglePredictionChartData();
                       if (!chartData) return null;
 
-                      const { casualtyComparisonData, damageComparisonData, weatherComparisonData, impactComparisonData } = chartData;
+                      const {
+                        casualtyComparisonData,
+                        damageComparisonData,
+                        weatherComparisonData,
+                        impactComparisonData,
+                      } = chartData;
 
                       return (
                         <div className="space-y-8">
@@ -1458,13 +1584,15 @@ export default function ClusterPage() {
                               </BarChart>
                             </ResponsiveContainer>
                             <p className="text-xs text-gray-500 mt-2 text-center">
-                              Your input compared to typical values for each impact level
+                              Your input compared to typical values for each
+                              impact level
                             </p>
                           </div>
 
                           <div>
                             <h4 className="text-sm font-medium text-gray-700 mb-4">
-                              Your Input vs. {getClusterLabel(result.cluster)} Average - Casualties
+                              Your Input vs. {getClusterLabel(result.cluster)}{" "}
+                              Average - Casualties
                             </h4>
                             <ResponsiveContainer width="100%" height={250}>
                               <BarChart data={casualtyComparisonData}>
@@ -1473,14 +1601,18 @@ export default function ClusterPage() {
                                 <YAxis />
                                 <Tooltip />
                                 <Legend />
-                                <Bar dataKey="value" name="Total Casualties (Dead + Injured + Missing)" />
+                                <Bar
+                                  dataKey="value"
+                                  name="Total Casualties (Dead + Injured + Missing)"
+                                />
                               </BarChart>
                             </ResponsiveContainer>
                           </div>
 
                           <div>
                             <h4 className="text-sm font-medium text-gray-700 mb-4">
-                              Your Input vs. {getClusterLabel(result.cluster)} Average - Property Damage & Cost
+                              Your Input vs. {getClusterLabel(result.cluster)}{" "}
+                              Average - Property Damage & Cost
                             </h4>
                             <ResponsiveContainer width="100%" height={250}>
                               <BarChart data={damageComparisonData}>
@@ -1508,7 +1640,8 @@ export default function ClusterPage() {
 
                           <div>
                             <h4 className="text-sm font-medium text-gray-700 mb-4">
-                              Your Input vs. {getClusterLabel(result.cluster)} Average - Weather Metrics
+                              Your Input vs. {getClusterLabel(result.cluster)}{" "}
+                              Average - Weather Metrics
                             </h4>
                             <ResponsiveContainer width="100%" height={250}>
                               <LineChart data={weatherComparisonData}>
@@ -1654,7 +1787,7 @@ export default function ClusterPage() {
                   Download Template
                 </button>
               </div>
-              
+
               <div className="space-y-4">
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
                   <input
@@ -1695,9 +1828,9 @@ export default function ClusterPage() {
                     Required Columns:
                   </h4>
                   <p className="text-xs text-blue-800">
-                    families, persons, barangays, dead, injured_ill, missing, 
-                    totally_damaged, partially_damaged, cost, duration_hrs, 
-                    max_sustained_wind, max_24hr_rainfall, total_storm_rainfall, 
+                    families, persons, barangays, dead, injured_ill, missing,
+                    totally_damaged, partially_damaged, cost, duration_hrs,
+                    max_sustained_wind, max_24hr_rainfall, total_storm_rainfall,
                     min_pressure, region
                   </p>
                 </div>
@@ -1720,11 +1853,15 @@ export default function ClusterPage() {
                 {bulkValidationErrors.length > 0 && (
                   <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg max-h-96 overflow-y-auto">
                     <h4 className="text-sm font-semibold text-yellow-900 mb-3 sticky top-0 bg-yellow-50 pb-2">
-                      ⚠️ Validation Errors ({bulkValidationErrors.length} row{bulkValidationErrors.length > 1 ? 's' : ''})
+                      ⚠️ Validation Errors ({bulkValidationErrors.length} row
+                      {bulkValidationErrors.length > 1 ? "s" : ""})
                     </h4>
                     <div className="space-y-3">
                       {bulkValidationErrors.map((error) => (
-                        <div key={error.rowNumber} className="border-l-4 border-yellow-400 pl-3">
+                        <div
+                          key={error.rowNumber}
+                          className="border-l-4 border-yellow-400 pl-3"
+                        >
                           <p className="text-xs font-semibold text-yellow-900 mb-1">
                             Row {error.rowNumber}:
                           </p>
@@ -1750,7 +1887,9 @@ export default function ClusterPage() {
                           : "bg-blue-600 text-white hover:bg-blue-700"
                       }`}
                     >
-                      {bulkLoading ? "Processing..." : `Predict ${bulkData.length} Rows`}
+                      {bulkLoading
+                        ? "Processing..."
+                        : `Predict ${bulkData.length} Rows`}
                     </button>
                     {bulkResults.length > 0 && (
                       <button
@@ -1778,131 +1917,139 @@ export default function ClusterPage() {
             </div>
 
             {/* Charts Section - NEW */}
-            {bulkResults.length > 0 && (() => {
-              const { pieData, casualtyData, damageData, weatherData } = getChartData();
-              return (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-6">
-                    Impact Profile Visualization
-                  </h3>
+            {bulkResults.length > 0 &&
+              (() => {
+                const { pieData, casualtyData, damageData, weatherData } =
+                  getChartData();
+                return (
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-6">
+                      Impact Profile Visualization
+                    </h3>
 
-                  {/* Distribution Pie Chart */}
-                  <div className="mb-8">
-                    <h4 className="text-sm font-medium text-gray-700 mb-4">
-                      Impact Level Distribution
-                    </h4>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={pieData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={(entry: any) =>
-                            `${entry.name}: ${((entry.percent || 0) * 100).toFixed(0)}%`
-                          }
-                          outerRadius={100}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {pieData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
+                    {/* Distribution Pie Chart */}
+                    <div className="mb-8">
+                      <h4 className="text-sm font-medium text-gray-700 mb-4">
+                        Impact Level Distribution
+                      </h4>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={pieData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={(entry: any) =>
+                              `${entry.name}: ${(
+                                (entry.percent || 0) * 100
+                              ).toFixed(0)}%`
+                            }
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {pieData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
 
-                  {/* Casualties Bar Chart */}
-                  <div className="mb-8">
-                    <h4 className="text-sm font-medium text-gray-700 mb-4">
-                      Total Casualties by Impact Level
-                    </h4>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={casualtyData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Bar dataKey="casualties" name="Total Casualties" fill="#8b5cf6" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                    {/* Casualties Bar Chart */}
+                    <div className="mb-8">
+                      <h4 className="text-sm font-medium text-gray-700 mb-4">
+                        Total Casualties by Impact Level
+                      </h4>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={casualtyData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Bar
+                            dataKey="casualties"
+                            name="Total Casualties"
+                            fill="#8b5cf6"
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
 
-                  {/* Property Damage Bar Chart */}
-                  <div className="mb-8">
-                    <h4 className="text-sm font-medium text-gray-700 mb-4">
-                      Property Damage & Relief Cost by Impact Level
-                    </h4>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={damageData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis yAxisId="left" orientation="left" />
-                        <YAxis yAxisId="right" orientation="right" />
-                        <Tooltip />
-                        <Legend />
-                        <Bar
-                          yAxisId="left"
-                          dataKey="damaged"
-                          name="Houses Damaged"
-                          fill="#3b82f6"
-                        />
-                        <Bar
-                          yAxisId="right"
-                          dataKey="cost"
-                          name="Relief Cost (Million PHP)"
-                          fill="#f59e0b"
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                    {/* Property Damage Bar Chart */}
+                    <div className="mb-8">
+                      <h4 className="text-sm font-medium text-gray-700 mb-4">
+                        Property Damage & Relief Cost by Impact Level
+                      </h4>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={damageData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis yAxisId="left" orientation="left" />
+                          <YAxis yAxisId="right" orientation="right" />
+                          <Tooltip />
+                          <Legend />
+                          <Bar
+                            yAxisId="left"
+                            dataKey="damaged"
+                            name="Houses Damaged"
+                            fill="#3b82f6"
+                          />
+                          <Bar
+                            yAxisId="right"
+                            dataKey="cost"
+                            name="Relief Cost (Million PHP)"
+                            fill="#f59e0b"
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
 
-                  {/* Weather Data Line Chart */}
-                  <div className="mb-8">
-                    <h4 className="text-sm font-medium text-gray-700 mb-4">
-                      Average Weather Metrics by Impact Level
-                    </h4>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={weatherData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis yAxisId="left" />
-                        <YAxis yAxisId="right" orientation="right" />
-                        <Tooltip />
-                        <Legend />
-                        <Line
-                          yAxisId="left"
-                          type="monotone"
-                          dataKey="wind"
-                          stroke="#06b6d4"
-                          strokeWidth={2}
-                          name="Wind Speed (kph)"
-                        />
-                        <Line
-                          yAxisId="left"
-                          type="monotone"
-                          dataKey="rainfall"
-                          stroke="#10b981"
-                          strokeWidth={2}
-                          name="Rainfall (mm)"
-                        />
-                        <Line
-                          yAxisId="right"
-                          type="monotone"
-                          dataKey="pressure"
-                          stroke="#8b5cf6"
-                          strokeWidth={2}
-                          name="Pressure (hPa)"
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
+                    {/* Weather Data Line Chart */}
+                    <div className="mb-8">
+                      <h4 className="text-sm font-medium text-gray-700 mb-4">
+                        Average Weather Metrics by Impact Level
+                      </h4>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={weatherData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis yAxisId="left" />
+                          <YAxis yAxisId="right" orientation="right" />
+                          <Tooltip />
+                          <Legend />
+                          <Line
+                            yAxisId="left"
+                            type="monotone"
+                            dataKey="wind"
+                            stroke="#06b6d4"
+                            strokeWidth={2}
+                            name="Wind Speed (kph)"
+                          />
+                          <Line
+                            yAxisId="left"
+                            type="monotone"
+                            dataKey="rainfall"
+                            stroke="#10b981"
+                            strokeWidth={2}
+                            name="Rainfall (mm)"
+                          />
+                          <Line
+                            yAxisId="right"
+                            type="monotone"
+                            dataKey="pressure"
+                            stroke="#8b5cf6"
+                            strokeWidth={2}
+                            name="Pressure (hPa)"
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
-                </div>
-              );
-            })()}
+                );
+              })()}
 
             {/* Data Preview */}
             {bulkData.length > 0 && (
@@ -1919,53 +2066,94 @@ export default function ClusterPage() {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Row</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Families</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Persons</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Barangays</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dead</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Wind (kph)</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Region</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                          Row
+                        </th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                          Families
+                        </th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                          Persons
+                        </th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                          Barangays
+                        </th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                          Dead
+                        </th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                          Wind (kph)
+                        </th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                          Region
+                        </th>
                         {bulkResults.length > 0 && (
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Impact Level</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                            Impact Level
+                          </th>
                         )}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {(bulkResults.length > 0 ? bulkResults : bulkData).slice(0, 10).map((row, idx) => {
-                        const hasError = bulkValidationErrors.some(e => e.rowNumber === row.rowNumber);
-                        return (
-                          <tr key={idx} className={`${hasError ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
-                            <td className="px-3 py-2 text-sm text-gray-900">
-                              {row.rowNumber}
-                              {hasError && <span className="ml-1 text-yellow-600">⚠️</span>}
-                            </td>
-                            <td className="px-3 py-2 text-sm text-gray-900">{row.families}</td>
-                            <td className="px-3 py-2 text-sm text-gray-900">{row.persons}</td>
-                            <td className="px-3 py-2 text-sm text-gray-900">{row.barangays}</td>
-                            <td className="px-3 py-2 text-sm text-gray-900">{row.dead}</td>
-                            <td className="px-3 py-2 text-sm text-gray-900">{row.max_sustained_wind}</td>
-                            <td className="px-3 py-2 text-sm text-gray-900">{row.region}</td>
-                            {bulkResults.length > 0 && (
-                              <td className="px-3 py-2 text-sm">
-                                <span
-                                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                    row.cluster === 0
-                                      ? "bg-green-100 text-green-800"
-                                      : row.cluster === 1
-                                      ? "bg-red-100 text-red-800"
-                                      : row.cluster === 2
-                                      ? "bg-orange-100 text-orange-800"
-                                      : "bg-gray-100 text-gray-800"
-                                  }`}
-                                >
-                                  {row.impact_level}
-                                </span>
+                      {(bulkResults.length > 0 ? bulkResults : bulkData)
+                        .slice(0, 10)
+                        .map((row, idx) => {
+                          const hasError = bulkValidationErrors.some(
+                            (e) => e.rowNumber === row.rowNumber
+                          );
+                          return (
+                            <tr
+                              key={idx}
+                              className={`${
+                                hasError ? "bg-yellow-50" : "hover:bg-gray-50"
+                              }`}
+                            >
+                              <td className="px-3 py-2 text-sm text-gray-900">
+                                {row.rowNumber}
+                                {hasError && (
+                                  <span className="ml-1 text-yellow-600">
+                                    ⚠️
+                                  </span>
+                                )}
                               </td>
-                            )}
-                          </tr>
-                        );
-                      })}
+                              <td className="px-3 py-2 text-sm text-gray-900">
+                                {row.families}
+                              </td>
+                              <td className="px-3 py-2 text-sm text-gray-900">
+                                {row.persons}
+                              </td>
+                              <td className="px-3 py-2 text-sm text-gray-900">
+                                {row.barangays}
+                              </td>
+                              <td className="px-3 py-2 text-sm text-gray-900">
+                                {row.dead}
+                              </td>
+                              <td className="px-3 py-2 text-sm text-gray-900">
+                                {row.max_sustained_wind}
+                              </td>
+                              <td className="px-3 py-2 text-sm text-gray-900">
+                                {row.region}
+                              </td>
+                              {bulkResults.length > 0 && (
+                                <td className="px-3 py-2 text-sm">
+                                  <span
+                                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                      row.cluster === 0
+                                        ? "bg-green-100 text-green-800"
+                                        : row.cluster === 1
+                                        ? "bg-red-100 text-red-800"
+                                        : row.cluster === 2
+                                        ? "bg-orange-100 text-orange-800"
+                                        : "bg-gray-100 text-gray-800"
+                                    }`}
+                                  >
+                                    {row.impact_level}
+                                  </span>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
                     </tbody>
                   </table>
                   {bulkData.length > 10 && (
