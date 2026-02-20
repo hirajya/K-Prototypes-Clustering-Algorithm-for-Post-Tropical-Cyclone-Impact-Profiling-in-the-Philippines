@@ -1077,7 +1077,7 @@ export default function ClusterPage() {
           </p>
 
           {/* Data Disclaimer */}
-          <div className="mt-6 max-w-3xl mx-auto bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="mt-6 max-w-5xl mx-auto bg-amber-50 border border-amber-200 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <svg
                 className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0"
