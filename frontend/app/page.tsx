@@ -124,7 +124,7 @@ export default function Home() {
                   ensure transparency and trust, the system applies explainable
                   machine learning methods that convert complex model outputs
                   into human-readable severity tiers, helping stakeholders for
-                  post-tropical cyclone assessment.
+                  post-tropical cyclone assessment. Low, Moderate, and High Impact.
                 </p>
               </div>
 
@@ -335,7 +335,7 @@ export default function Home() {
               <p className="text-gray-600 mb-4">
                 Classify tropical cyclones impact into low, moderate, and high impact based
                 on comprehensive impact metrics including affected populations,
-                casualties, and property damage.
+                casualties, property damage, and weather data.
               </p>
               <Link
                 href="/cluster"

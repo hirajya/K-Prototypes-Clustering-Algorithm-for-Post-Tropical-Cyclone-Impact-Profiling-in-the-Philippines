@@ -12,6 +12,7 @@ const Navbar = () => {
     { href: '/', label: 'Home' },
     { href: '/cluster', label: 'Impact Profiling' },
     { href: '/prediction', label: 'Future Damage Prediction' },
+    { href: '/mapping', label: 'Weather Stations' },
   ]
 
   return (
