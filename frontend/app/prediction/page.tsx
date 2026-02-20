@@ -30,6 +30,7 @@ interface FormData {
   total_storm_rainfall: string
   min_pressure: string
   duration: string
+  region: string
 }
 
 const initialFormData: FormData = {
@@ -38,13 +39,22 @@ const initialFormData: FormData = {
   total_storm_rainfall: '',
   min_pressure: '',
   duration: '',
+  region: '',
 }
+
+// Only regions present in the training data
+const VALID_REGIONS = [
+  { value: '2',  label: 'Region 2 – Cagayan Valley' },
+  { value: '3',  label: 'Region 3 – Central Luzon' },
+  { value: '5',  label: 'Region 5 – Bicol Region' },
+  { value: '8',  label: 'Region 8 – Eastern Visayas' },
+]
 
 const getTyphoonType = (maxSustainedWind: number): { type: number; label: string } => {
   if (maxSustainedWind > 184) return { type: 4, label: 'STY - Super Typhoon' }
   else if (maxSustainedWind >= 118) return { type: 3, label: 'TY - Typhoon' }
-  else if (maxSustainedWind >= 89) return { type: 2, label: 'STS - Severe Tropical Storm' }
-  else if (maxSustainedWind >= 62) return { type: 0, label: 'TS - Tropical Storm' }
+  else if (maxSustainedWind >= 89)  return { type: 2, label: 'STS - Severe Tropical Storm' }
+  else if (maxSustainedWind >= 62)  return { type: 0, label: 'TS - Tropical Storm' }
   else return { type: 1, label: 'TD - Tropical Depression' }
 }
 
@@ -91,7 +101,7 @@ export default function PredictionPage() {
     return getTyphoonType(wind)
   }, [formData.max_sustained_wind])
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     const updated = { ...formData, [name]: value }
     setFormData(updated)
@@ -140,6 +150,10 @@ export default function PredictionPage() {
       errors.duration = 'Duration cannot be negative'
     }
 
+    if (!data.region) {
+      errors.region = 'Region is required for accurate severity prediction'
+    }
+
     setValidationErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -156,12 +170,13 @@ export default function PredictionPage() {
 
     try {
       const payload = {
-        max_sustained_wind: parseFloat(formData.max_sustained_wind) || 0,
-        max_24hr_rainfall: parseFloat(formData.max_24hr_rainfall) || 0,
+        max_sustained_wind:   parseFloat(formData.max_sustained_wind) || 0,
+        max_24hr_rainfall:    parseFloat(formData.max_24hr_rainfall) || 0,
         total_storm_rainfall: parseFloat(formData.total_storm_rainfall) || 0,
-        min_pressure: parseFloat(formData.min_pressure) || 0,
-        duration: parseFloat(formData.duration) || 0,
-        typhoon_type: typhoonClassification.type,
+        min_pressure:         parseFloat(formData.min_pressure) || 0,
+        duration:             parseFloat(formData.duration) || 0,
+        typhoon_type:         typhoonClassification.type,
+        region:               formData.region ? parseInt(formData.region) : null,
       }
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -237,15 +252,17 @@ export default function PredictionPage() {
       const row = rows[i]
       const wind = parseFloat(row.max_sustained_wind) || 0
       const tc = getTyphoonType(wind)
+      const regionVal = row.region ? parseInt(row.region) : null
 
       try {
         const payload = {
-          max_sustained_wind: wind,
-          max_24hr_rainfall: parseFloat(row.max_24hr_rainfall) || 0,
+          max_sustained_wind:   wind,
+          max_24hr_rainfall:    parseFloat(row.max_24hr_rainfall) || 0,
           total_storm_rainfall: parseFloat(row.total_storm_rainfall) || 0,
-          min_pressure: parseFloat(row.min_pressure) || 0,
-          duration: parseFloat(row.duration) || 0,
-          typhoon_type: tc.type,
+          min_pressure:         parseFloat(row.min_pressure) || 0,
+          duration:             parseFloat(row.duration) || 0,
+          typhoon_type:         tc.type,
+          region:               regionVal,
         }
 
         const response = await fetch(`${apiUrl}/predict`, {
@@ -275,7 +292,7 @@ export default function PredictionPage() {
     if (bulkRows.length === 0) return
 
     const headers = [
-      'max_sustained_wind', 'max_24hr_rainfall', 'total_storm_rainfall', 'min_pressure', 'duration',
+      'max_sustained_wind', 'max_24hr_rainfall', 'total_storm_rainfall', 'min_pressure', 'duration', 'region',
       'families', 'persons', 'barangays', 'dead', 'injured', 'missing',
       'totally_damaged', 'partially_damaged', 'severity_cluster', 'severity_label'
     ]
@@ -285,6 +302,7 @@ export default function PredictionPage() {
       return [
         row.input.max_sustained_wind, row.input.max_24hr_rainfall,
         row.input.total_storm_rainfall, row.input.min_pressure, row.input.duration,
+        row.input.region ?? '',
         r?.families ?? '', r?.persons ?? '', r?.barangays ?? '',
         r?.dead ?? '', r?.injured ?? '', r?.missing ?? '',
         r?.totally_damaged ?? '', r?.partially_damaged ?? '',
@@ -303,8 +321,8 @@ export default function PredictionPage() {
   }
 
   const downloadTemplate = () => {
-    const headers = ['max_sustained_wind', 'max_24hr_rainfall', 'total_storm_rainfall', 'min_pressure', 'duration']
-    const exampleRow = ['150', '100', '200', '970', '24']
+    const headers = ['max_sustained_wind', 'max_24hr_rainfall', 'total_storm_rainfall', 'min_pressure', 'duration', 'region']
+    const exampleRow = ['150', '100', '200', '970', '24', '5']
     const csv = [headers.join(','), exampleRow.join(',')].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -333,27 +351,66 @@ export default function PredictionPage() {
           </p>
         </div>
 
-        {/* Disclaimer — amber style matching screenshot */}
-        <div className="mb-8 bg-amber-50 rounded-2xl p-6 border border-amber-200">
-          <div className="flex items-start gap-3">
-            <span className="text-amber-500 text-lg mt-0.5">⚠</span>
-            <div>
-              <h3 className="font-semibold text-amber-900 mb-1">Data Scope &amp; Limitations</h3>
-              <p className="text-amber-800 text-sm leading-relaxed">
-                This model is trained on historical data from <strong className="font-semibold">2020–2024</strong> covering <strong className="font-semibold">Regions 2, 3, 5, and 8</strong> in the Philippines. Impact predictions may vary significantly based on the <strong className="font-semibold">specific region and local geographical characteristics</strong> of the affected area. Results should be interpreted within the context of the municipality-level scope and regional differences in vulnerability, infrastructure, and preparedness.
-              </p>
+          {/* Data Disclaimer */}
+          <div className="mt-6 max-w-5xl mx-auto bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8">
+            <div className="flex items-start gap-3">
+              <svg
+                className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <div className="text-left">
+                <h3 className="text-sm font-semibold text-amber-900 mb-1">
+                  Data Scope & Limitations
+                </h3>
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  The system&rsquo;s predictive outputs are{" "}
+                  <strong>
+                    spatially limited to the catchment areas of reporting
+                    meteorological stations
+                  </strong>
+                  , providing only{" "}
+                  <strong>municipality- or zone-level forecasts</strong>. It
+                  assumes <strong>uniform exposure</strong> within each coverage
+                  area and does not account for{" "}
+                  <strong>micro-topographical differences</strong> such as
+                  coastal, mountainous, or low-lying barangays. Since the model
+                  relies on{" "}
+                  <strong>
+                    station-level data without GIS elevation inputs
+                  </strong>
+                  , localized terrain-specific impacts cannot be assessed.
+                </p>
+
+                <p className="text-xs text-amber-800 leading-relaxed mt-2">
+                  The model is trained on{" "}
+                  <strong>historical data from 2020&ndash;2024</strong> across
+                  selected regions in the Philippines (Regions 2, 3, 5, and 8).
+                  Therefore, predictions may vary depending on{" "}
+                  <strong>
+                    regional geography, vulnerability, infrastructure, and
+                    preparedness
+                  </strong>
+                  . Results should be interpreted within the{" "}
+                  <strong>municipality-level scope and regional context</strong>
+                  .
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Tabs — centered, styled like clustering's button approach */}
+        {/* Tabs */}
         <div className="flex justify-center gap-4 mb-8">
           <button
             onClick={() => setActiveTab('instance')}
             className={`px-6 py-3 font-semibold rounded-lg transition-colors ${
-              activeTab === 'instance'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              activeTab === 'instance' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
             Instance Prediction
@@ -361,83 +418,126 @@ export default function PredictionPage() {
           <button
             onClick={() => setActiveTab('batch')}
             className={`px-6 py-3 font-semibold rounded-lg transition-colors ${
-              activeTab === 'batch'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              activeTab === 'batch' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
             Batch Prediction (CSV)
           </button>
         </div>
 
+        {/* ── Instance Prediction Tab ── */}
         {activeTab === 'instance' && (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
 
+              {/* Form */}
               <div>
                 <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
                   <h2 className="text-xl font-semibold text-gray-900 mb-6">Input Weather Features</h2>
 
                   <div className="space-y-6">
+
+                    {/* Region */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Region <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="region"
+                        value={formData.region}
+                        onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 ${
+                          validationErrors.region ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        required
+                      >
+                        <option value="">Select a region...</option>
+                        {VALID_REGIONS.map(r => (
+                          <option key={r.value} value={r.value}>{r.label}</option>
+                        ))}
+                      </select>
+                      {validationErrors.region
+                        ? <p className="text-red-500 text-xs mt-1">{validationErrors.region}</p>
+                        : <p className="text-xs text-gray-500 mt-1">Region is the strongest predictor of severity — required for accurate results</p>
+                      }
+                    </div>
+
+                    {/* Max Sustained Wind */}
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Max Sustained Wind (kph)</label>
                       <input
                         type="number" name="max_sustained_wind" value={formData.max_sustained_wind}
                         onChange={handleInputChange} min="60" max="500" step="1"
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.max_sustained_wind ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                          validationErrors.max_sustained_wind ? 'border-red-500' : 'border-gray-300'
+                        }`}
                         required
                       />
                       {validationErrors.max_sustained_wind && <p className="text-red-500 text-xs mt-1">{validationErrors.max_sustained_wind}</p>}
                     </div>
 
+                    {/* Typhoon Classification */}
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Typhoon Classification</label>
                       <div className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">{typhoonClassification.label}</div>
                       <p className="text-xs text-gray-500 mt-1">Auto-detected based on max sustained wind</p>
                     </div>
 
+                    {/* Max 24hr Rainfall */}
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Max 24hr Rainfall (mm)</label>
                       <input
                         type="number" name="max_24hr_rainfall" value={formData.max_24hr_rainfall}
                         onChange={handleInputChange} min="0" step="0.1"
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.max_24hr_rainfall ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                          validationErrors.max_24hr_rainfall ? 'border-red-500' : 'border-gray-300'
+                        }`}
                         required
                       />
                       {validationErrors.max_24hr_rainfall && <p className="text-red-500 text-xs mt-1">{validationErrors.max_24hr_rainfall}</p>}
                     </div>
 
+                    {/* Total Storm Rainfall */}
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Total Storm Rainfall (mm)</label>
                       <input
                         type="number" name="total_storm_rainfall" value={formData.total_storm_rainfall}
                         onChange={handleInputChange} min="0" step="0.1"
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.total_storm_rainfall ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                          validationErrors.total_storm_rainfall ? 'border-red-500' : 'border-gray-300'
+                        }`}
                         required
                       />
                       {validationErrors.total_storm_rainfall && <p className="text-red-500 text-xs mt-1">{validationErrors.total_storm_rainfall}</p>}
                     </div>
 
+                    {/* Min Pressure */}
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Min Pressure (hPa)</label>
                       <input
                         type="number" name="min_pressure" value={formData.min_pressure}
                         onChange={handleInputChange} min="870" max="1100" step="0.1"
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.min_pressure ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                          validationErrors.min_pressure ? 'border-red-500' : 'border-gray-300'
+                        }`}
                         required
                       />
                       {validationErrors.min_pressure && <p className="text-red-500 text-xs mt-1">{validationErrors.min_pressure}</p>}
                     </div>
 
+                    {/* Duration */}
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Duration (hours)</label>
                       <input
                         type="number" name="duration" value={formData.duration}
                         onChange={handleInputChange} min="0" step="0.1"
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.duration ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                          validationErrors.duration ? 'border-red-500' : 'border-gray-300'
+                        }`}
                       />
                       {validationErrors.duration && <p className="text-red-500 text-xs mt-1">{validationErrors.duration}</p>}
                     </div>
+
                   </div>
 
                   {Object.keys(validationErrors).length > 0 && (
@@ -453,17 +553,25 @@ export default function PredictionPage() {
                     <button
                       type="submit"
                       disabled={loading || Object.keys(validationErrors).length > 0}
-                      className={`flex-1 px-6 py-3 font-semibold rounded-lg transition-colors ${loading || Object.keys(validationErrors).length > 0 ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                      className={`flex-1 px-6 py-3 font-semibold rounded-lg transition-colors ${
+                        loading || Object.keys(validationErrors).length > 0
+                          ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
                     >
                       {loading ? 'Processing...' : 'Predict Damage'}
                     </button>
-                    <button type="button" onClick={handleReset} className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors">
+                    <button
+                      type="button" onClick={handleReset}
+                      className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors"
+                    >
                       Reset
                     </button>
                   </div>
                 </form>
               </div>
 
+              {/* Results */}
               <div>
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 h-full">
                   <h2 className="text-xl font-semibold text-gray-900 mb-6">Prediction Results</h2>
@@ -539,13 +647,14 @@ export default function PredictionPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                       </div>
-                      <p className="text-gray-500 text-sm">Enter weather data and click &quot;Predict Damage&quot; to see results</p>
+                      <p className="text-gray-500 text-sm">Select a region, enter weather data, and click &quot;Predict Damage&quot; to see results</p>
                     </div>
                   )}
                 </div>
               </div>
             </div>
 
+            {/* Charts */}
             {result && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
@@ -553,8 +662,8 @@ export default function PredictionPage() {
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={[
                       { name: 'Families', value: result.families },
-                      { name: 'Persons', value: result.persons },
-                      { name: 'Barangays', value: result.barangays },
+                      { name: 'Persons',  value: result.persons },
+                      { name: 'Barangays',value: result.barangays },
                     ]}>
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} />
@@ -572,7 +681,7 @@ export default function PredictionPage() {
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Casualties</h3>
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={[
-                      { name: 'Dead', value: result.dead },
+                      { name: 'Dead',    value: result.dead },
                       { name: 'Injured', value: result.injured },
                       { name: 'Missing', value: result.missing },
                     ]}>
@@ -592,7 +701,7 @@ export default function PredictionPage() {
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Housing Damage</h3>
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={[
-                      { name: 'Totally Damaged', value: result.totally_damaged },
+                      { name: 'Totally Damaged',   value: result.totally_damaged },
                       { name: 'Partially Damaged', value: result.partially_damaged },
                     ]}>
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} />
@@ -610,13 +719,13 @@ export default function PredictionPage() {
           </>
         )}
 
+        {/* ── Batch Prediction Tab ── */}
         {activeTab === 'batch' && (
           <div className="space-y-6">
-
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-              {/* Header row: title + Download Template button */}
+
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">Bulk Prediction</h2>
+                <h2 className="text-xl font-semibold text-gray-900">Batch Prediction</h2>
                 <button
                   onClick={downloadTemplate}
                   className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 bg-white text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
@@ -628,7 +737,7 @@ export default function PredictionPage() {
                 </button>
               </div>
 
-              {/* Dashed dropzone */}
+              {/* Dropzone */}
               <label
                 htmlFor="csv-upload"
                 className="flex flex-col items-center justify-center w-full h-44 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors mb-6"
@@ -636,23 +745,27 @@ export default function PredictionPage() {
                 <svg className="w-10 h-10 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                <p className="text-sm font-medium text-gray-700 mb-1">Click to upload Excel/CSV file</p>
-                <p className="text-xs text-gray-400">Supports .xlsx, .xls, .csv</p>
+                <p className="text-sm font-medium text-gray-700 mb-1">Click to upload CSV file</p>
+                <p className="text-xs text-gray-400">Supports .csv</p>
                 <input
                   id="csv-upload"
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv,.xlsx,.xls"
+                  accept=".csv"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
               </label>
 
-              {/* Required Columns blue box */}
+              {/* Required columns info */}
               <div className="bg-blue-50 rounded-xl border border-blue-100 p-4">
-                <p className="text-sm font-semibold text-blue-900 mb-2">Required Columns:</p>
+                <p className="text-sm font-semibold text-blue-900 mb-1">Required Columns:</p>
                 <p className="text-sm text-blue-700 leading-relaxed">
                   max_sustained_wind, max_24hr_rainfall, total_storm_rainfall, min_pressure, duration
+                </p>
+                <p className="text-sm font-semibold text-blue-900 mt-3 mb-1">Optional Column:</p>
+                <p className="text-sm text-blue-700 leading-relaxed">
+                  region — accepted values: <strong>2, 3, 5, 8</strong>. Strongly recommended for accurate severity prediction.
                 </p>
               </div>
 
@@ -709,6 +822,7 @@ export default function PredictionPage() {
                         <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Wind (kph)</th>
                         <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Pressure (hPa)</th>
                         <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Duration (hrs)</th>
+                        <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Region</th>
                         <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Severity</th>
                         <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Families</th>
                         <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Persons</th>
@@ -726,6 +840,7 @@ export default function PredictionPage() {
                           <td className="py-3 px-3 font-medium">{row.input.max_sustained_wind}</td>
                           <td className="py-3 px-3">{row.input.min_pressure}</td>
                           <td className="py-3 px-3">{row.input.duration}</td>
+                          <td className="py-3 px-3 text-gray-600">{row.input.region ? `Region ${row.input.region}` : '—'}</td>
                           <td className="py-3 px-3">
                             {row.result ? (
                               <span className={`text-xs font-bold px-2 py-1 rounded-full ${getSeverityBadge(row.result.severity_cluster)}`}>
