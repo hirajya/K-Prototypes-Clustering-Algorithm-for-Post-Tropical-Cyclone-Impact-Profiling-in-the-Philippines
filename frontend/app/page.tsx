@@ -11,6 +11,14 @@ const cycloneImages = [
   "tino-satellite-november-5-2025-4pm.webp",
 ];
 
+// Photo credits for each image
+const imageCredits = [
+  "BBC Science Focus Magazine 2024",
+  "UNICEF Philippines 2013",
+  "WIRED/CHARISM SAYAT/Getty Images 2020",
+  "Rappler 2025",
+];
+
 export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -82,6 +90,10 @@ export default function Home() {
               alt={`Typhoon image ${index + 1}`}
               className="w-full h-full object-cover"
             />
+            {/* Photo Credit */}
+            <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm">
+              {imageCredits[index]}
+            </div>
           </div>
         ))}
 
@@ -545,6 +557,10 @@ export default function Home() {
                   alt="Typhoon impact"
                   className="w-full h-full object-cover"
                 />
+                {/* Photo Credit */}
+                <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm z-20">
+                  UNICEF/UN0711350/Pham Ha Duy Linh
+                </div>
               </div>
 
               {/* Content Side */}
@@ -687,6 +703,10 @@ export default function Home() {
                   Documentation of tropical cyclone impacts
                 </p>
               </div>
+              {/* Photo Credit */}
+              <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm z-10">
+                UNICEF Philippines 2013
+              </div>
             </div>
             <div className="relative rounded-xl overflow-hidden shadow-md group">
               <img
@@ -699,6 +719,10 @@ export default function Home() {
                   Understanding tropical cyclones
                 </p>
               </div>
+              {/* Photo Credit */}
+              <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm z-10">
+                BBC Science Focus Magazine 2024
+              </div>
             </div>
             <div className="relative rounded-xl overflow-hidden shadow-md group">
               <img
@@ -710,6 +734,10 @@ export default function Home() {
                 <p className="text-white text-sm font-medium">
                   Science-based monitoring
                 </p>
+              </div>
+              {/* Photo Credit */}
+              <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm z-10">
+                WIRED/CHARISM SAYAT/Getty Images 2020
               </div>
             </div>
           </div>
