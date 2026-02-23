@@ -2,11 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const Navbar = () => {
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isVisible, setIsVisible] = useState(true)
+  const [lastScrollY, setLastScrollY] = useState(0)
 
   const navItems = [
     { href: '/', label: 'Home' },
@@ -15,8 +17,32 @@ const Navbar = () => {
     { href: '/mapping', label: 'Weather Stations' },
   ]
 
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+      
+      // Show navbar when scrolling up, hide when scrolling down
+      if (currentScrollY < lastScrollY || currentScrollY < 10) {
+        setIsVisible(true)
+      } else if (currentScrollY > lastScrollY && currentScrollY > 80) {
+        setIsVisible(false)
+        setIsMobileMenuOpen(false) // Close mobile menu when hiding
+      }
+      
+      setLastScrollY(currentScrollY)
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [lastScrollY])
+
   return (
-    <nav className="bg-white shadow-lg border-b border-gray-200">
+    <nav className={`bg-white shadow-lg border-b border-gray-200 fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ${
+      isVisible ? 'translate-y-0' : '-translate-y-full'
+    }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
