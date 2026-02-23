@@ -3,75 +3,42 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 
-// Tropical cyclone data for carousel
-const cyclones = [
-  {
-    name: "Typhoon Yolanda (Haiyan)",
-    year: "2013",
-    image: "https://images.unsplash.com/photo-1527482797697-8795b05a13fe?w=800",
-    description: "One of the strongest tropical cyclones ever recorded",
-  },
-  {
-    name: "Typhoon Rolly (Goni)",
-    year: "2020",
-    image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800",
-    description: "Super typhoon with devastating winds and rainfall",
-  },
-  {
-    name: "Typhoon Odette (Rai)",
-    year: "2021",
-    image: "https://images.unsplash.com/photo-1534088568595-a066f410bcda?w=800",
-    description: "Caused widespread destruction across Visayas and Mindanao",
-  },
-  {
-    name: "Typhoon Ulysses (Vamco)",
-    year: "2020",
-    image: "https://images.unsplash.com/photo-1547683905-f686c993aae5?w=800",
-    description: "Triggered severe flooding in Metro Manila and surrounding areas",
-  },
+// Tropical cyclone images for carousel
+const cycloneImages = [
+  "/typhoon-vs-hurricane.jpg",
+  "/UNIPH2019034.JPG.webp",
+  "/Science_typhoon_1229395040.webp",
+  "tino-satellite-november-5-2025-4pm.webp",
 ];
 
 export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  // Auto-advance carousel
+  // Auto-advance carousel every 5 seconds
   useEffect(() => {
-    const timer = setInterval(() => {
-      nextSlide();
+    const interval = setInterval(() => {
+      setIsAnimating(true);
+      setCurrentSlide((prev) => (prev + 1) % cycloneImages.length);
+      setTimeout(() => setIsAnimating(false), 700);
     }, 5000);
-    return () => clearInterval(timer);
-  }, [currentSlide]);
 
-  const nextSlide = () => {
-    if (!isAnimating) {
-      setIsAnimating(true);
-      setCurrentSlide((prev) => (prev + 1) % cyclones.length);
-      setTimeout(() => setIsAnimating(false), 500);
-    }
-  };
-
-  const prevSlide = () => {
-    if (!isAnimating) {
-      setIsAnimating(true);
-      setCurrentSlide((prev) => (prev - 1 + cyclones.length) % cyclones.length);
-      setTimeout(() => setIsAnimating(false), 500);
-    }
-  };
+    return () => clearInterval(interval);
+  }, []);
 
   const goToSlide = (index: number) => {
     if (!isAnimating) {
       setIsAnimating(true);
       setCurrentSlide(index);
-      setTimeout(() => setIsAnimating(false), 500);
+      setTimeout(() => setIsAnimating(false), 700);
     }
   };
 
   return (
     <div className="min-h-screen">
-      {/* Hero Carousel Section */}
-      <section className="relative w-full h-[600px] overflow-hidden">
-        {cyclones.map((cyclone, index) => (
+      {/* Hero Carousel Section - Images Only */}
+      <section className="relative w-full h-[400px] overflow-hidden">
+        {cycloneImages.map((image, index) => (
           <div
             key={index}
             className={`absolute inset-0 transition-all duration-700 ease-in-out ${
@@ -80,77 +47,24 @@ export default function Home() {
                 : "opacity-0 scale-105"
             }`}
           >
-            <div
-              className="w-full h-full bg-cover bg-center"
-              style={{ backgroundImage: `url(${cyclone.image})` }}
-            >
-              <div className="w-full h-full bg-gradient-to-t from-black/90 via-black/60 to-black/30 flex items-center justify-center">
-                <div className="text-center px-8 max-w-4xl">
-                  <h1 className="text-5xl md:text-7xl font-bold text-white mb-4 animate-fade-in-up">
-                    {cyclone.name}
-                  </h1>
-                  <p className="text-2xl md:text-3xl text-blue-200 mb-3 animate-fade-in-up animation-delay-200">
-                    {cyclone.year}
-                  </p>
-                  <p className="text-xl md:text-2xl text-gray-200 animate-fade-in-up animation-delay-400">
-                    {cyclone.description}
-                  </p>
-                </div>
-              </div>
-            </div>
+            <img
+              src={image}
+              alt={`Typhoon image ${index + 1}`}
+              className="w-full h-full object-cover"
+            />
           </div>
         ))}
 
-        {/* Navigation Arrows */}
-        <button
-          onClick={prevSlide}
-          className="absolute left-6 top-1/2 -translate-y-1/2 w-14 h-14 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center transition-all duration-200 group z-10"
-          aria-label="Previous slide"
-        >
-          <svg
-            className="w-7 h-7 text-white group-hover:scale-110 transition-transform"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-        </button>
-        <button
-          onClick={nextSlide}
-          className="absolute right-6 top-1/2 -translate-y-1/2 w-14 h-14 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center transition-all duration-200 group z-10"
-          aria-label="Next slide"
-        >
-          <svg
-            className="w-7 h-7 text-white group-hover:scale-110 transition-transform"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-        </button>
-
         {/* Dots Navigation */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-3 z-10">
-          {cyclones.map((_, index) => (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+          {cycloneImages.map((_, index) => (
             <button
               key={index}
               onClick={() => goToSlide(index)}
-              className={`h-3 rounded-full transition-all duration-300 ${
+              className={`h-2.5 rounded-full transition-all duration-300 ${
                 index === currentSlide
-                  ? "bg-white w-10"
-                  : "bg-white/50 hover:bg-white/75 w-3"
+                  ? "bg-white w-8"
+                  : "bg-white/50 hover:bg-white/75 w-2.5"
               }`}
               aria-label={`Go to slide ${index + 1}`}
             />
@@ -163,25 +77,32 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 animate-fade-in-up">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Clustering for Post-Tropical Cyclone Impact Profiling in the Philippines
+              Clustering for Post-Tropical Cyclone Impact Profiling in the
+              Philippines
             </h2>
             <p className="text-lg md:text-xl text-gray-600 max-w-4xl mx-auto">
-              A smart system that helps understand typhoon damage and predict future impacts
+              A smart system that helps understand tropical cyclone damage and
+              predict future impacts
             </p>
           </div>
 
           <div className="bg-white rounded-2xl shadow-lg p-8 md:p-12 mb-8 animate-fade-in-up animation-delay-200">
             <div className="prose prose-lg max-w-none">
               <p className="text-gray-700 leading-relaxed mb-6">
-                The Philippines faces an average of 20 typhoons each year, causing devastating floods, 
-                infrastructure damage, and loss of lives. After each disaster, government agencies release 
-                reports with damage assessments—but these reports are often difficult to compare and analyze quickly.
+                The Philippines faces an average of 20 tropical cyclones each
+                year, causing devastating floods, infrastructure damage, and
+                loss of lives. After each disaster, government agencies release
+                reports with damage assessments—but these reports are often
+                difficult to compare and analyze quickly.
               </p>
 
               <p className="text-gray-700 leading-relaxed mb-6">
-                This system <strong className="text-gray-900">automatically analyzes typhoon damage reports</strong> 
-                and provides clear insights to help responders make faster, better decisions about where help is 
-                needed most urgently.
+                This system{" "}
+                <strong className="text-gray-900">
+                  automatically analyzes tropical cyclone damage reports
+                </strong>
+                , provides clear insights to help responders make faster,
+                better decisions about where help is needed most urgently.
               </p>
 
               <p className="text-gray-700 leading-relaxed mb-8">
@@ -213,8 +134,9 @@ export default function Home() {
                   </h3>
                 </div>
                 <p className="text-gray-700 leading-relaxed">
-                  Groups affected areas by severity level (Low, Moderate, High) based on casualties, 
-                  property damage, and affected populations. This helps identify which communities need 
+                  Groups affected areas by severity level (Low, Moderate, High)
+                  based on casualties, property damage, and affected
+                  populations. This helps identify which communities need
                   immediate attention.
                 </p>
               </div>
@@ -242,9 +164,10 @@ export default function Home() {
                   </h3>
                 </div>
                 <p className="text-gray-700 leading-relaxed">
-                  Estimates potential damage based on weather forecasts like wind speed and rainfall. 
-                  This allows emergency teams to prepare resources and evacuate communities before a 
-                  typhoon strikes.
+                  Estimates potential damage based on weather forecasts like
+                  wind speed and rainfall. This allows emergency teams to
+                  prepare resources and evacuate communities before a tropical
+                  cyclone strikes.
                 </p>
               </div>
             </div>
@@ -288,10 +211,12 @@ export default function Home() {
                 </h3>
               </div>
               <p className="text-gray-700 leading-relaxed mb-4">
-                After a typhoon hits, government agencies release detailed damage reports. However, 
-                these reports contain overwhelming amounts of information spread across many pages, 
-                making it hard to quickly identify which areas are worst affected. Manual analysis is 
-                time-consuming and can delay critical aid delivery.
+                After a tropical cyclone hits, government agencies release
+                detailed damage reports. However, these reports contain
+                overwhelming amounts of information spread across many pages,
+                making it hard to quickly identify which areas are worst
+                affected. Manual analysis is time-consuming and can delay
+                critical aid delivery.
               </p>
             </div>
 
@@ -318,9 +243,10 @@ export default function Home() {
                 </h3>
               </div>
               <p className="text-gray-700 leading-relaxed mb-6">
-                This system instantly processes damage reports and organizes affected areas into 
-                clear severity categories, helping decision-makers prioritize response efforts and 
-                allocate resources efficiently.
+                This system instantly processes damage reports and organizes
+                affected areas into clear severity categories, helping
+                decision-makers prioritize response efforts and allocate
+                resources efficiently.
               </p>
 
               <div className="space-y-3">
@@ -341,7 +267,7 @@ export default function Home() {
                           clipRule="evenodd"
                         />
                       </svg>
-                      Analyzes typhoon damage reports automatically
+                      Analyzes tropical cyclone damage reports automatically
                     </li>
                     <li className="flex items-start">
                       <svg
@@ -369,7 +295,7 @@ export default function Home() {
                           clipRule="evenodd"
                         />
                       </svg>
-                      Predicts potential damage from incoming typhoons
+                      Predicts potential damage from incoming tropical cyclone
                     </li>
                   </ul>
                 </div>
@@ -413,9 +339,9 @@ export default function Home() {
                 Impact Assessment
               </h3>
               <p className="text-gray-600 mb-4">
-                See which areas were hit hardest by categorizing damage into Low, Moderate, 
-                and High severity levels based on casualties, infrastructure damage, and affected 
-                populations.
+                See which areas were hit hardest by categorizing damage into
+                Low, Moderate, and High severity levels based on casualties,
+                infrastructure damage, and affected populations.
               </p>
               <Link
                 href="/cluster"
@@ -459,8 +385,9 @@ export default function Home() {
                 Damage Forecasting
               </h3>
               <p className="text-gray-600 mb-4">
-                Estimate potential damage before a typhoon arrives using weather forecasts. 
-                Prepare evacuation plans and position relief supplies in advance.
+                Estimate potential damage before a tropical cyclone arrives
+                using weather forecasts. Prepare evacuation plans and position
+                relief supplies in advance.
               </p>
               <Link
                 href="/prediction"
@@ -494,7 +421,8 @@ export default function Home() {
               Understanding Severity Levels
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Each typhoon impact is classified into one of three categories
+              Each tropical cyclones impact is classified into one of three
+              categories
             </p>
           </div>
 
@@ -506,13 +434,11 @@ export default function Home() {
                   High Impact
                 </span>
               </div>
-              <h4 className="font-semibold text-gray-900 mb-2">
-                Most Severe
-              </h4>
+              <h4 className="font-semibold text-gray-900 mb-2">Most Severe</h4>
               <p className="text-gray-600 text-sm">
-                Areas with major casualties, widespread property destruction, and large displaced 
-                populations. These communities need immediate emergency response and substantial 
-                resources.
+                Areas with major casualties, widespread property destruction,
+                and large displaced populations. These communities need
+                immediate emergency response and substantial resources.
               </p>
             </div>
 
@@ -527,8 +453,9 @@ export default function Home() {
                 Moderate Severity
               </h4>
               <p className="text-gray-600 text-sm">
-                Areas with noticeable damage affecting specific communities. These locations need 
-                coordinated relief efforts and continued monitoring.
+                Areas with noticeable damage affecting specific communities.
+                These locations need coordinated relief efforts and continued
+                monitoring.
               </p>
             </div>
 
@@ -539,13 +466,197 @@ export default function Home() {
                   Low Impact
                 </span>
               </div>
-              <h4 className="font-semibold text-gray-900 mb-2">
-                Less Severe
-              </h4>
+              <h4 className="font-semibold text-gray-900 mb-2">Less Severe</h4>
               <p className="text-gray-600 text-sm">
-                Areas with minimal casualties and limited property damage. Standard emergency 
-                protocols are sufficient for these situations.
+                Areas with minimal casualties and limited property damage.
+                Standard emergency protocols are sufficient for these
+                situations.
               </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Disclaimer Section */}
+      <section className="py-20 bg-gradient-to-br from-amber-50 via-orange-50 to-red-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+              {/* Image Side */}
+              <div className="relative h-64 md:h-auto">
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-900/20 to-transparent z-10"></div>
+                <img
+                  src="UN0711350.webp"
+                  alt="Typhoon impact"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+
+              {/* Content Side */}
+              <div className="p-8 md:p-12">
+                <div className="flex items-start mb-6">
+                  <div className="w-12 h-12 bg-amber-500 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                    <svg
+                      className="w-6 h-6 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                      Important Disclaimer
+                    </h2>
+                    <p className="text-sm text-amber-600 font-semibold">
+                      Please read before using this system
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 text-gray-700">
+                  <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg">
+                    <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                      <svg
+                        className="w-5 h-5 text-amber-600 mr-2"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Regional and Geographic Variations
+                    </h3>
+                    <p className="text-sm leading-relaxed">
+                      <strong>
+                        Area and region significantly affect tropical cyclone
+                        impact.
+                      </strong>{" "}
+                      Coastal areas, mountainous regions, and urban centers
+                      experience different damage patterns. The scope of
+                      location—whether provincial, municipal, or barangay
+                      level—influences the accuracy of predictions and
+                      assessments.
+                    </p>
+                  </div>
+
+                  <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                    <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                      <svg
+                        className="w-5 h-5 text-blue-600 mr-2"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Data Coverage Period
+                    </h3>
+                    <p className="text-sm leading-relaxed">
+                      This system is trained on tropical cyclone data from{" "}
+                      <strong>2020 to 2024 (inclusive)</strong>, covering
+                      post-tropical cyclone impacts across the Philippines
+                      during this period. Predictions are most reliable for
+                      scenarios similar to those observed within this timeframe.
+                    </p>
+                  </div>
+
+                  <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
+                    <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                      <svg
+                        className="w-5 h-5 text-red-600 mr-2"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Usage Guidelines
+                    </h3>
+                    <p className="text-sm leading-relaxed">
+                      This tool is designed to{" "}
+                      <strong>support decision-making, not replace it.</strong>{" "}
+                      Always consider local knowledge, real-time conditions, and
+                      official government advisories when planning disaster
+                      response and resource allocation.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">
+                        2020-2024
+                      </div>
+                      <div className="text-xs text-gray-600">Data Coverage</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-cyan-600">
+                        Philippines
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        Geographic Scope
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Additional Context Images */}
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative rounded-xl overflow-hidden shadow-md group">
+              <img
+                src="/UNIPH2019034.JPG.webp"
+                alt="Typhoon damage documentation"
+                className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-4">
+                <p className="text-white text-sm font-medium">
+                  Documentation of tropical cyclone impacts
+                </p>
+              </div>
+            </div>
+            <div className="relative rounded-xl overflow-hidden shadow-md group">
+              <img
+                src="/typhoon-vs-hurricane.jpg"
+                alt="Tropical cyclone patterns"
+                className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-4">
+                <p className="text-white text-sm font-medium">
+                  Understanding tropical cyclones
+                </p>
+              </div>
+            </div>
+            <div className="relative rounded-xl overflow-hidden shadow-md group">
+              <img
+                src="/Science_typhoon_1229395040.webp"
+                alt="Typhoon science and monitoring"
+                className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-4">
+                <p className="text-white text-sm font-medium">
+                  Science-based monitoring
+                </p>
+              </div>
             </div>
           </div>
         </div>
