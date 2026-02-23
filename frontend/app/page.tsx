@@ -598,9 +598,8 @@ export default function Home() {
                       </strong>{" "}
                       Coastal areas, mountainous regions, and urban centers
                       experience different damage patterns. The scope of
-                      location—whether provincial, municipal, or barangay
-                      level—influences the accuracy of predictions and
-                      assessments.
+                      location—natural structures, population density, and infrastructure—plays a critical role in determining the severity of impacts. Always
+                      consider local geographic factors when interpreting results.
                     </p>
                   </div>
 
