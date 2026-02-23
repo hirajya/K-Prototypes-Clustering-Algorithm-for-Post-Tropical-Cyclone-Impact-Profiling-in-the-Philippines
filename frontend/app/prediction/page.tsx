@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts'
 
 interface ForecastResult {
   families: number
@@ -80,6 +80,23 @@ const getSeverityDesc = (cluster: number) => {
   if (cluster === 1) return 'text-red-700'
   if (cluster === 2) return 'text-orange-700'
   return 'text-green-700'
+}
+
+// Custom label rendered above each bar
+const BarLabel = (props: { x?: number; y?: number; width?: number; value?: number }) => {
+  const { x = 0, y = 0, width = 0, value = 0 } = props
+  return (
+    <text
+      x={x + width / 2}
+      y={y - 5}
+      fill="#374151"
+      textAnchor="middle"
+      fontSize={11}
+      fontWeight={600}
+    >
+      {value.toLocaleString()}
+    </text>
+  )
 }
 
 export default function PredictionPage() {
@@ -351,75 +368,35 @@ export default function PredictionPage() {
           </p>
         </div>
 
-          {/* Data Disclaimer */}
-          <div className="mt-6 max-w-5xl mx-auto bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8">
-            <div className="flex items-start gap-3">
-              <svg
-                className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <div className="text-left">
-                <h3 className="text-sm font-semibold text-amber-900 mb-1">
-                  Data Scope & Limitations
-                </h3>
-                <p className="text-xs text-amber-800 leading-relaxed">
-                  The system&rsquo;s predictive outputs are{" "}
-                  <strong>
-                    spatially limited to the catchment areas of reporting
-                    meteorological stations
-                  </strong>
-                  , providing only{" "}
-                  <strong>municipality- or zone-level forecasts</strong>. It
-                  assumes <strong>uniform exposure</strong> within each coverage
-                  area and does not account for{" "}
-                  <strong>micro-topographical differences</strong> such as
-                  coastal, mountainous, or low-lying barangays. Since the model
-                  relies on{" "}
-                  <strong>
-                    station-level data without GIS elevation inputs
-                  </strong>
-                  , localized terrain-specific impacts cannot be assessed.
-                </p>
-
-                <p className="text-xs text-amber-800 leading-relaxed mt-2">
-                  The model is trained on{" "}
-                  <strong>historical data from 2020&ndash;2024</strong> across
-                  selected regions in the Philippines (Regions 2, 3, 5, and 8).
-                  Therefore, predictions may vary depending on{" "}
-                  <strong>
-                    regional geography, vulnerability, infrastructure, and
-                    preparedness
-                  </strong>
-                  . Results should be interpreted within the{" "}
-                  <strong>municipality-level scope and regional context</strong>
-                  .
-                </p>
-              </div>
+        {/* Data Disclaimer */}
+        <div className="mt-6 max-w-5xl mx-auto bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <div className="text-left">
+              <h3 className="text-sm font-semibold text-amber-900 mb-1">Data Scope &amp; Limitations</h3>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                The system&rsquo;s predictive outputs are <strong>spatially limited to the catchment areas of reporting meteorological stations</strong>, providing only <strong>municipality- or zone-level forecasts</strong>. It assumes <strong>uniform exposure</strong> within each coverage area and does not account for <strong>micro-topographical differences</strong> such as coastal, mountainous, or low-lying barangays. Since the model relies on <strong>station-level data without GIS elevation inputs</strong>, localized terrain-specific impacts cannot be assessed.
+              </p>
+              <p className="text-xs text-amber-800 leading-relaxed mt-2">
+                The model is trained on <strong>historical data from 2020&ndash;2024</strong> across selected regions in the Philippines (Regions 2, 3, 5, and 8). Therefore, predictions may vary depending on <strong>regional geography, vulnerability, infrastructure, and preparedness</strong>. Results should be interpreted within the <strong>municipality-level scope and regional context</strong>.
+              </p>
             </div>
           </div>
+        </div>
 
         {/* Tabs */}
         <div className="flex justify-center gap-4 mb-8">
           <button
             onClick={() => setActiveTab('instance')}
-            className={`px-6 py-3 font-semibold rounded-lg transition-colors ${
-              activeTab === 'instance' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
+            className={`px-6 py-3 font-semibold rounded-lg transition-colors ${activeTab === 'instance' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
           >
             Instance Prediction
           </button>
           <button
             onClick={() => setActiveTab('batch')}
-            className={`px-6 py-3 font-semibold rounded-lg transition-colors ${
-              activeTab === 'batch' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
+            className={`px-6 py-3 font-semibold rounded-lg transition-colors ${activeTab === 'batch' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
           >
             Batch Prediction (CSV)
           </button>
@@ -439,16 +416,12 @@ export default function PredictionPage() {
 
                     {/* Region */}
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Region
-                      </label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Region</label>
                       <select
                         name="region"
                         value={formData.region}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 ${
-                          validationErrors.region ? 'border-red-500' : 'border-gray-300'
-                        }`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 ${validationErrors.region ? 'border-red-500' : 'border-gray-300'}`}
                         required
                       >
                         <option value="">Select a region...</option>
@@ -456,6 +429,7 @@ export default function PredictionPage() {
                           <option key={r.value} value={r.value}>{r.label}</option>
                         ))}
                       </select>
+                      {validationErrors.region && <p className="text-red-500 text-xs mt-1">{validationErrors.region}</p>}
                     </div>
 
                     {/* Max Sustained Wind */}
@@ -464,9 +438,7 @@ export default function PredictionPage() {
                       <input
                         type="number" name="max_sustained_wind" value={formData.max_sustained_wind}
                         onChange={handleInputChange} min="60" max="500" step="1"
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                          validationErrors.max_sustained_wind ? 'border-red-500' : 'border-gray-300'
-                        }`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.max_sustained_wind ? 'border-red-500' : 'border-gray-300'}`}
                         required
                       />
                       {validationErrors.max_sustained_wind && <p className="text-red-500 text-xs mt-1">{validationErrors.max_sustained_wind}</p>}
@@ -485,9 +457,7 @@ export default function PredictionPage() {
                       <input
                         type="number" name="max_24hr_rainfall" value={formData.max_24hr_rainfall}
                         onChange={handleInputChange} min="0" step="0.1"
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                          validationErrors.max_24hr_rainfall ? 'border-red-500' : 'border-gray-300'
-                        }`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.max_24hr_rainfall ? 'border-red-500' : 'border-gray-300'}`}
                         required
                       />
                       {validationErrors.max_24hr_rainfall && <p className="text-red-500 text-xs mt-1">{validationErrors.max_24hr_rainfall}</p>}
@@ -499,9 +469,7 @@ export default function PredictionPage() {
                       <input
                         type="number" name="total_storm_rainfall" value={formData.total_storm_rainfall}
                         onChange={handleInputChange} min="0" step="0.1"
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                          validationErrors.total_storm_rainfall ? 'border-red-500' : 'border-gray-300'
-                        }`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.total_storm_rainfall ? 'border-red-500' : 'border-gray-300'}`}
                         required
                       />
                       {validationErrors.total_storm_rainfall && <p className="text-red-500 text-xs mt-1">{validationErrors.total_storm_rainfall}</p>}
@@ -513,9 +481,7 @@ export default function PredictionPage() {
                       <input
                         type="number" name="min_pressure" value={formData.min_pressure}
                         onChange={handleInputChange} min="870" max="1100" step="0.1"
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                          validationErrors.min_pressure ? 'border-red-500' : 'border-gray-300'
-                        }`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.min_pressure ? 'border-red-500' : 'border-gray-300'}`}
                         required
                       />
                       {validationErrors.min_pressure && <p className="text-red-500 text-xs mt-1">{validationErrors.min_pressure}</p>}
@@ -527,9 +493,7 @@ export default function PredictionPage() {
                       <input
                         type="number" name="duration" value={formData.duration}
                         onChange={handleInputChange} min="0" step="0.1"
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                          validationErrors.duration ? 'border-red-500' : 'border-gray-300'
-                        }`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.duration ? 'border-red-500' : 'border-gray-300'}`}
                       />
                       {validationErrors.duration && <p className="text-red-500 text-xs mt-1">{validationErrors.duration}</p>}
                     </div>
@@ -549,18 +513,11 @@ export default function PredictionPage() {
                     <button
                       type="submit"
                       disabled={loading || Object.keys(validationErrors).length > 0}
-                      className={`flex-1 px-6 py-3 font-semibold rounded-lg transition-colors ${
-                        loading || Object.keys(validationErrors).length > 0
-                          ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                          : 'bg-blue-600 text-white hover:bg-blue-700'
-                      }`}
+                      className={`flex-1 px-6 py-3 font-semibold rounded-lg transition-colors ${loading || Object.keys(validationErrors).length > 0 ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                     >
                       {loading ? 'Processing...' : 'Predict Damage'}
                     </button>
-                    <button
-                      type="button" onClick={handleReset}
-                      className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors"
-                    >
+                    <button type="button" onClick={handleReset} className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors">
                       Reset
                     </button>
                   </div>
@@ -647,21 +604,27 @@ export default function PredictionPage() {
               </div>
             </div>
 
-            {/* Charts */}
+            {/* ── Charts with value labels on top of bars ── */}
             {result && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                {/* People Affected */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">People Affected</h3>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={[
-                      { name: 'Families', value: result.families },
-                      { name: 'Persons',  value: result.persons },
-                      { name: 'Barangays',value: result.barangays },
-                    ]}>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart
+                      data={[
+                        { name: 'Families', value: result.families },
+                        { name: 'Persons',  value: result.persons },
+                        { name: 'Barangays',value: result.barangays },
+                      ]}
+                      margin={{ top: 20, right: 10, left: 10, bottom: 0 }}
+                    >
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} />
                       <Tooltip formatter={(value: unknown) => (value as number).toLocaleString()} />
                       <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                        <LabelList dataKey="value" content={<BarLabel />} />
                         <Cell fill="#3b82f6" />
                         <Cell fill="#6366f1" />
                         <Cell fill="#8b5cf6" />
@@ -670,18 +633,23 @@ export default function PredictionPage() {
                   </ResponsiveContainer>
                 </div>
 
+                {/* Casualties */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Casualties</h3>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={[
-                      { name: 'Dead',    value: result.dead },
-                      { name: 'Injured', value: result.injured },
-                      { name: 'Missing', value: result.missing },
-                    ]}>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart
+                      data={[
+                        { name: 'Dead',    value: result.dead },
+                        { name: 'Injured', value: result.injured },
+                        { name: 'Missing', value: result.missing },
+                      ]}
+                      margin={{ top: 20, right: 10, left: 10, bottom: 0 }}
+                    >
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} />
                       <Tooltip formatter={(value: unknown) => (value as number).toLocaleString()} />
                       <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                        <LabelList dataKey="value" content={<BarLabel />} />
                         <Cell fill="#ef4444" />
                         <Cell fill="#f97316" />
                         <Cell fill="#eab308" />
@@ -690,23 +658,29 @@ export default function PredictionPage() {
                   </ResponsiveContainer>
                 </div>
 
+                {/* Housing Damage */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Housing Damage</h3>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={[
-                      { name: 'Totally Damaged',   value: result.totally_damaged },
-                      { name: 'Partially Damaged', value: result.partially_damaged },
-                    ]}>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart
+                      data={[
+                        { name: 'Totally Damaged',   value: result.totally_damaged },
+                        { name: 'Partially Damaged', value: result.partially_damaged },
+                      ]}
+                      margin={{ top: 20, right: 10, left: 10, bottom: 0 }}
+                    >
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} />
                       <Tooltip formatter={(value: unknown) => (value as number).toLocaleString()} />
                       <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                        <LabelList dataKey="value" content={<BarLabel />} />
                         <Cell fill="#7c3aed" />
                         <Cell fill="#ec4899" />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
+
               </div>
             )}
           </>
