@@ -8,21 +8,15 @@ from typing import List, Dict, Any, Optional
 import os
 
 app = FastAPI(
-    title="Typhoon Impact Clustering & Prediction API",
-    description="API for clustering typhoon impact levels and predicting damage severity",
+    title="Tropical Cyclone Impact Clustering & Prediction API",
+    description="API for clustering tropical cyclone impact levels and predicting damage severity",
     version="1.0.0"
 )
 
 # Enable CORS for frontend requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://*.vercel.app",  # All Vercel preview deployments
-        "https://your-app-name.vercel.app",  # Replace with your actual Vercel domain
-        "*"  # Allow all origins (less secure, but works for development)
-    ],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -43,7 +37,7 @@ class ClusteringInput(BaseModel):
     cost: float = Field(..., description="Cost of damage in PHP")
     duration_hrs: float = Field(..., description="Duration in hours")
     max_sustained_wind: float = Field(..., description="Maximum sustained wind in kph")
-    typhoon_type: int = Field(..., description="Typhoon type (TS=0, TD=1, STS=2, TY=3, STY=4)")
+    typhoon_type: int = Field(..., description="Tropical cyclone type (TD=0, TS=1, STS=2, TY=3, STY=4)")
     max_24hr_rainfall: float = Field(..., description="Maximum 24hr rainfall in mm")
     total_storm_rainfall: float = Field(..., description="Total storm rainfall in mm")
     min_pressure: float = Field(..., description="Minimum pressure in hPa")
@@ -68,20 +62,17 @@ class ForecastInput(BaseModel):
     min_pressure: float = Field(..., description="Minimum pressure in hPa")
     duration: float = Field(..., description="Duration in hours")
 
-
 class ForecastResponse(BaseModel):
-    """Response from damage prediction"""
+    """Response containing predictions for all impact categories"""
     families: float
     persons: float
     barangays: float
     dead: float
-    injured_ill: float
+    injured: float 
     missing: float
-    cost: float
-    partially_damaged: float
     totally_damaged: float
+    partially_damaged: float
     message: str
-
 
 class HealthResponse(BaseModel):
     """Health check response"""
@@ -93,33 +84,32 @@ class HealthResponse(BaseModel):
 
 # ==================== Model Loading ====================
 
+prediction_targets = [
+    'families', 'person', 'brgy', 'totally', 'partially', 
+    'dead', 'missing', 'injured'
+]
+
 # Global model storage
 models = {
-    'clustering': None,
+    'clustering': {},
     'scaler': None,
     'feature_columns': None,
-    'prediction': None
+    'prediction': {}
 }
 
 
 def load_clustering_models():
     """Load clustering models from the models/clustering directory"""
-    # Try local models folder first (for Render deployment)
-    clustering_dir = os.path.join(os.path.dirname(__file__), 'models', 'clustering')
-    
-    # If not found, try parent directory (for local development)
-    if not os.path.exists(clustering_dir):
-        clustering_dir = os.path.join(os.path.dirname(__file__), '..', 'models', 'clustering')
+    clustering_dir = os.path.join(os.path.dirname(__file__), '..', 'models', 'clustering')
     
     try:
         models['clustering'] = joblib.load(os.path.join(clustering_dir, 'clustering_model.joblib'))
         models['scaler'] = joblib.load(os.path.join(clustering_dir, 'scaler.joblib'))
         models['feature_columns'] = joblib.load(os.path.join(clustering_dir, 'feature_columns.joblib'))
-        print(f"✓ Clustering models loaded successfully from {clustering_dir}")
+        print("✓ Clustering models loaded successfully")
         return True
     except FileNotFoundError as e:
         print(f"⚠ Clustering models not found: {e}")
-        print(f"  Searched in: {clustering_dir}")
         print("  Please run the notebook to export the models first.")
         return False
     except Exception as e:
@@ -128,32 +118,77 @@ def load_clustering_models():
 
 
 def load_prediction_models():
-    """Load prediction models from the models/prediction directory"""
-    # Try local models folder first (for Render deployment)
-    prediction_dir = os.path.join(os.path.dirname(__file__), 'models', 'prediction')
+    """Load all prediction models dynamically"""
+    base_path = os.path.join(os.path.dirname(__file__), '..', 'models', 'prediction')
+    print(base_path)
     
-    # If not found, try parent directory (for local development)
-    if not os.path.exists(prediction_dir):
-        prediction_dir = os.path.join(os.path.dirname(__file__), '..', 'models', 'prediction')
+    print(f"DEBUG: Looking for models in: {os.path.abspath(base_path)}")
     
+
+    loaded_count = 0
+    for target in prediction_targets:
+        try:
+            # Load the trio for each target
+            model = joblib.load(os.path.join(base_path, f'{target}_model.joblib'))
+            scaler = joblib.load(os.path.join(base_path, f'{target}_scaler.joblib'))
+            features = joblib.load(os.path.join(base_path, f'{target}_features.joblib'))
+            
+            models['prediction'][target] = {
+                'model': model,
+                'scaler': scaler,
+                'features': features
+            }
+            loaded_count += 1
+        except FileNotFoundError:
+            print(f"  ⚠ Missing files for target: {target}")
+        except Exception as e:
+            print(f"  ⚠ Error loading {target}: {e}")
+
+    print(f"✓ Prediction models loaded: {loaded_count}/{len(prediction_targets)} targets ready")
+    return loaded_count > 0
+
+def get_weather_features(input_data: ForecastInput) -> Dict[str, float]:
+    return {
+        'max_sustained_wind_kph': input_data.max_sustained_wind,
+        'max_24hr_rainfall_mm': input_data.max_24hr_rainfall,
+        'total_storm_rainfall_mm': input_data.total_storm_rainfall,
+        'min_pressure_hpa': input_data.min_pressure,
+        'duration_in_PAR_hours': input_data.duration,
+    }
+
+def predict_target(target_name: str, assets: dict, weather_data: dict) -> int:
     try:
-        models['prediction'] = joblib.load(os.path.join(prediction_dir, 'prediction_model.joblib'))
-        print(f"✓ Prediction models loaded successfully from {prediction_dir}")
-        return True
-    except FileNotFoundError:
-        print("⚠ Prediction models not found (not yet implemented)")
-        return False
+        model = assets['model']
+        scaler = assets['scaler']
+        required_features = assets['features']
+
+        # Create DataFrame from input dictionary
+        input_df = pd.DataFrame([weather_data])
+
+        # Fill missing columns with 0.0 (Safety check)
+        for feature in required_features:
+            if feature not in input_df.columns:
+                input_df[feature] = 0.0
+        
+        # Reorder columns to match training exactly
+        input_df = input_df[required_features]
+
+        # Scale and Predict
+        scaled_input = scaler.transform(input_df)
+        prediction = model.predict(scaled_input)[0]
+
+        return int(max(0, prediction))
+
     except Exception as e:
-        print(f"⚠ Error loading prediction models: {e}")
-        return False
-
-
+        print(f"   ⚠️ Error predicting '{target_name}': {e}")
+        return 0
+    
 # Load models at startup
 @app.on_event("startup")
 async def startup_event():
     """Load all models when the application starts"""
     print("=" * 60)
-    print("Starting Typhoon Impact API...")
+    print("Starting Tropical Cyclone Impact API...")
     print("=" * 60)
     load_clustering_models()
     load_prediction_models()
@@ -166,7 +201,7 @@ async def startup_event():
 async def root():
     """Root endpoint with API information"""
     return {
-        "message": "Typhoon Impact Clustering & Prediction API",
+        "message": "Tropical Cyclone Impact Clustering & Prediction API",
         "version": "1.0.0",
         "endpoints": {
             "clustering": "/cluster",
@@ -191,11 +226,11 @@ async def health_check():
 @app.post("/cluster", response_model=ClusteringResponse, tags=["Clustering"])
 async def predict_cluster(input_data: ClusteringInput):
     """
-    Predict the cluster assignment for typhoon impact data.
+    Predict the cluster assignment for tropical cyclone impact data.
     
-    Typhoon Type Encoding:
-    - TS (Tropical Storm) = 0
-    - TD (Tropical Depression) = 1
+    Tropical Cyclone Type Encoding:
+    - TD (Tropical Depression) = 0
+    - TS (Tropical Storm) = 1
     - STS (Severe Tropical Storm) = 2
     - TY (Typhoon) = 3
     - STY (Super Typhoon) = 4
@@ -254,9 +289,141 @@ async def predict_cluster(input_data: ClusteringInput):
         
         # Generate description
         descriptions = {
-            0: "Cluster 0: Typhoon impact pattern identified by the clustering algorithm.",
-            1: "Cluster 1: Typhoon impact pattern identified by the clustering algorithm.",
-            2: "Cluster 2: Typhoon impact pattern identified by the clustering algorithm."
+            0: """Lower severity events with minimal casualties and limited property damage requiring standard response protocols.
+
+### Families Affected
+
+Typically **13–610 families**, with around **90 families** affected in most cases.
+
+### Persons Affected
+
+Usually **50–2,300 people**, with a common impact of about **320 persons**.
+
+### Deaths
+
+Most events report **no deaths**, with **very rare cases** reaching up to **3 fatalities**.
+
+### Injured / Ill
+
+Generally **none**, though **isolated incidents** may involve injuries.
+
+### Missing Persons
+
+Typically **no missing persons**, with only **rare single cases** reported.
+
+### Totally Damaged Houses
+
+Most events report **no totally damaged houses**, with **limited damage** in rare cases.
+
+### Partially Damaged Houses
+
+Usually **none**, though **localized impacts** can affect **up to ~3,000 houses**.
+
+### Economic Cost (PHP)
+
+Often **zero or minimal**, but **isolated events** can result in **higher reported losses**.
+
+### Maximum Sustained Wind
+
+Commonly **110–195 kph**, reflecting **weak to moderate typhoon** conditions.
+
+### 24-Hour Rainfall
+
+Typically **56–136 mm**, with extreme rainfall occurring only in rare cases.
+
+### Duration of Impact
+
+Impacts generally last **around 4–5 days**, consistent with short-lived events.""",
+            1: """Severe events with significant casualties, extensive property damage, and large affected populations requiring immediate response.
+
+### Families Affected
+
+Typically **5,000–16,000 families**, with around **9,000 families** affected in most events.
+
+### Persons Affected
+
+Usually **18,500–64,000 people**, with a typical impact of about **37,000 persons**.
+
+### Deaths
+
+Most events report **no deaths**, though **rare extreme cases** can reach up to **around 95 fatalities**.
+
+### Injured / Ill
+
+Generally **none to a few cases**, but injuries can rise to **several dozen** in more severe situations.
+
+### Missing Persons
+
+Typically **no missing persons**, with only **isolated cases** reported during extreme events.
+
+### Totally Damaged Houses
+
+Commonly **hundreds to over 1,000 houses**, with a typical value of around **500 totally damaged homes**.
+
+### Partially Damaged Houses
+
+Usually **2,000–4,700 houses**, indicating widespread but varying structural damage.
+
+### Economic Cost (PHP)
+
+Typically between **₱1.7 million and ₱5.8 million**, with severe cases exceeding **₱16 million**.
+
+### Maximum Sustained Wind
+
+Most events experience **155–195 kph winds**, consistent with strong typhoon conditions.
+
+### 24-Hour Rainfall
+
+Rainfall commonly ranges from **about 47–149 mm**, with extreme events producing much heavier totals.
+
+### Duration of Impact
+
+Impacts generally last **around 4–5 days**, with prolonged cases extending beyond this period.""",
+            2: """Moderate severity events with noticeable damage concentrated in specific regions requiring coordinated response.
+
+### Families Affected
+
+Typically **16–840 families**, with around **235 families** affected in most events.
+
+### Persons Affected
+
+Usually **60–3,300 people**, with a common impact of about **930 persons**.
+
+### Deaths
+
+Most events report **no deaths**, with **rare cases** reaching up to **3 fatalities**.
+
+### Injured / Ill
+
+Generally **none**, but injuries can rise to **around a dozen cases** in some events.
+
+### Missing Persons
+
+Typically **no missing persons**, with only **isolated cases** reported.
+
+### Totally Damaged Houses
+
+Most events report **no totally damaged houses**, though **localized damage** can reach **up to ~2,000 homes**.
+
+### Partially Damaged Houses
+
+Usually **no recorded partial damage**, but **moderate events** may affect **up to ~3,000 houses**.
+
+### Economic Cost (PHP)
+
+Often **minimal or unreported**, but some events incur costs of **up to ₱2 million**.
+
+### Maximum Sustained Wind
+
+Commonly **110–155 kph**, indicating **strong tropical storm to typhoon** conditions.
+
+### 24-Hour Rainfall
+
+Typically **50–117 mm**, with heavier rainfall in more intense cases.
+
+### Duration of Impact
+
+Impacts generally last **around 4–6 days**, with prolonged events extending longer."""
         }
         
         return ClusteringResponse(
@@ -267,59 +434,40 @@ async def predict_cluster(input_data: ClusteringInput):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Clustering prediction error: {str(e)}")
 
-
-@app.post("/forecast", response_model=ForecastResponse, tags=["Prediction"])
+@app.post("/predict", response_model=ForecastResponse, tags=["Prediction"])
 async def predict_damage(input_data: ForecastInput):
     """
-    Predict damage metrics based on weather features.
-    
-    Note: This endpoint is not yet implemented. The prediction model needs to be trained first.
+    Main Endpoint: Predicts ALL targets at once.
     """
-    if models['prediction'] is None:
-        # Return placeholder response indicating feature is not ready
-        return ForecastResponse(
-            families=0,
-            persons=0,
-            barangays=0,
-            dead=0,
-            injured_ill=0,
-            missing=0,
-            cost=0,
-            partially_damaged=0,
-            totally_damaged=0,
-            message="Prediction model not yet available. This feature is coming soon."
-        )
-    
-    try:
-        # Build feature array for prediction
-        features = np.array([[
-            input_data.max_sustained_wind,
-            input_data.typhoon_type if input_data.typhoon_type is not None else 0,
-            input_data.max_24hr_rainfall,
-            input_data.total_storm_rainfall,
-            input_data.min_pressure,
-            input_data.duration
-        ]])
-        
-        # Make predictions
-        predictions = models['prediction'].predict(features)
-        
-        return ForecastResponse(
-            families=float(predictions[0][0]),
-            persons=float(predictions[0][1]),
-            barangays=float(predictions[0][2]),
-            dead=float(predictions[0][3]),
-            injured_ill=float(predictions[0][4]),
-            missing=float(predictions[0][5]),
-            cost=float(predictions[0][6]),
-            partially_damaged=float(predictions[0][7]),
-            totally_damaged=float(predictions[0][8]),
-            message="Prediction successful"
-        )
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+    # 1. Validation
+    if not models.get('prediction'):
+        raise HTTPException(status_code=503, detail="Prediction models not loaded")
 
+    try:
+        # 2. Prepare Data
+        weather_features = get_weather_features(input_data)
+        
+        # 3. Run Predictions Loop (Predicts all of it at once)
+        results = {}
+        for target, assets in models['prediction'].items():
+            results[target] = predict_target(target, assets, weather_features)
+
+        # 4. Construct Response
+        return {
+            "families": results.get('families', 0),
+            "persons": results.get('person', 0),
+            "barangays": results.get('brgy', 0),
+            "dead": results.get('dead', 0),
+            "injured": results.get('injured', 0),
+            "missing": results.get('missing', 0),
+            "totally_damaged": results.get('totally', 0),
+            "partially_damaged": results.get('partially', 0),
+            "message": "Prediction successful"
+        }
+
+    except Exception as e:
+        print(f"Server Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.get("/api/maacli", tags=["MAACLI"])
 async def get_maacli_insights():

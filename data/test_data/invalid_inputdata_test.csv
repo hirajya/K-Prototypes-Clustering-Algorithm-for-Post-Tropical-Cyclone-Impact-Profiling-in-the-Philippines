@@ -1,0 +1,7 @@
+families,persons,barangays,dead,injured_ill,missing,totally_damaged,partially_damaged,cost,duration_hrs,max_sustained_wind,max_24hr_rainfall,total_storm_rainfall,min_pressure,region
+100,200,5,50,100,60,30,40,150000,48,120,100,80,980,2
+150,500,6,1,2,0,20,25,200000,800,140,150,300,960,3
+200,800,10,0,5,0,50,70,500000,72,600,180,400,950,5
+80,300,4,0,1,0,5,10,100000,24,100,2500,2600,990,8
+300,1200,12,2,3,1,100,200,1000000,60,160,180,170,1200,9
+60,250,3,0,0,0,200,300,75000,36,90,90,200,850,2
