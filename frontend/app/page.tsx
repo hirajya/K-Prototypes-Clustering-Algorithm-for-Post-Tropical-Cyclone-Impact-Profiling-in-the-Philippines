@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 // Tropical cyclone images for carousel
 const cycloneImages = [
@@ -15,6 +15,9 @@ export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
 
+  // Refs for intersection observer
+  const sectionRefs = useRef<(HTMLElement | null)[]>([]);
+
   // Auto-advance carousel every 5 seconds
   useEffect(() => {
     const interval = setInterval(() => {
@@ -24,6 +27,33 @@ export default function Home() {
     }, 5000);
 
     return () => clearInterval(interval);
+  }, []);
+
+  // Intersection Observer for fade-in animations
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("fade-in-visible");
+          }
+        });
+      },
+      {
+        threshold: 0.1,
+        rootMargin: "0px 0px -50px 0px",
+      }
+    );
+
+    sectionRefs.current.forEach((ref) => {
+      if (ref) observer.observe(ref);
+    });
+
+    return () => {
+      sectionRefs.current.forEach((ref) => {
+        if (ref) observer.unobserve(ref);
+      });
+    };
   }, []);
 
   const goToSlide = (index: number) => {
@@ -73,7 +103,12 @@ export default function Home() {
       </section>
 
       {/* Project Overview Section */}
-      <section className="py-20 bg-gradient-to-br from-gray-50 to-blue-50">
+      <section
+        ref={(el) => {
+          sectionRefs.current[0] = el;
+        }}
+        className="py-20 bg-gradient-to-br from-gray-50 to-blue-50 fade-in-section"
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 animate-fade-in-up">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
@@ -176,7 +211,12 @@ export default function Home() {
       </section>
 
       {/* Problem & Solution Section */}
-      <section className="py-20 bg-white">
+      <section
+        ref={(el) => {
+          sectionRefs.current[1] = el;
+        }}
+        className="py-20 bg-white fade-in-section"
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16 animate-fade-in-up">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
@@ -306,7 +346,12 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-gray-50">
+      <section
+        ref={(el) => {
+          sectionRefs.current[2] = el;
+        }}
+        className="py-20 bg-gray-50 fade-in-section"
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16 animate-fade-in-up">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
@@ -414,7 +459,12 @@ export default function Home() {
       </section>
 
       {/* Severity Levels Section */}
-      <section className="py-20 bg-white">
+      <section
+        ref={(el) => {
+          sectionRefs.current[3] = el;
+        }}
+        className="py-20 bg-white fade-in-section"
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16 animate-fade-in-up">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
@@ -478,7 +528,12 @@ export default function Home() {
       </section>
 
       {/* Disclaimer Section */}
-      <section className="py-20 bg-gradient-to-br from-amber-50 via-orange-50 to-red-50">
+      <section
+        ref={(el) => {
+          sectionRefs.current[4] = el;
+        }}
+        className="py-20 bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 fade-in-section"
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
@@ -694,6 +749,18 @@ export default function Home() {
             opacity: 1;
             transform: translateX(0);
           }
+        }
+
+        /* Fade-in section styles */
+        .fade-in-section {
+          opacity: 0;
+          transform: translateY(50px);
+          transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+        }
+
+        .fade-in-section.fade-in-visible {
+          opacity: 1;
+          transform: translateY(0);
         }
 
         .animate-fade-in-up {

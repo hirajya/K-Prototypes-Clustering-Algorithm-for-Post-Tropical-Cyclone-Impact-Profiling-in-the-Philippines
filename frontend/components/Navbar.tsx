@@ -22,7 +22,7 @@ const Navbar = () => {
           <div className="flex items-center">
             <Link href="/" className="flex-shrink-0 flex items-center">
               <div className="ml-3">
-                <span className="text-lg font-bold text-gray-900">Tropical Impact</span>
+                <span className="text-lg font-bold text-gray-900">Tropical Cyclones</span>
                 <span className="hidden sm:inline text-sm text-gray-500 ml-1">Impact Profiling and Future Damage Prediction</span>
               </div>
             </Link>
