@@ -550,6 +550,19 @@ export default function PredictionPage() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
+                        {/* Severity Cluster Card */}
+                        <div className={`col-span-2 p-4 rounded-lg border-2 ${getSeverityBorder(result.severity_cluster)}`}>
+                          <p className="text-xs font-medium mb-2" style={{ color: result.severity_cluster === 1 ? '#991b1b' : result.severity_cluster === 2 ? '#9a3412' : '#14532d' }}>Predicted Severity Level</p>
+                          <div className="flex items-center gap-3">
+                            <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${getSeverityBadge(result.severity_cluster)}`}>
+                              Cluster {result.severity_cluster}
+                            </span>
+                            <p className={`text-xl font-bold ${getSeverityText(result.severity_cluster)}`}>
+                              {result.severity_label}
+                            </p>
+                          </div>
+                        </div>
+
                         <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
                           <p className="text-xs text-blue-600 font-medium mb-1">Families Affected</p>
                           <p className="text-2xl font-bold text-blue-900">{result.families.toLocaleString()}</p>
