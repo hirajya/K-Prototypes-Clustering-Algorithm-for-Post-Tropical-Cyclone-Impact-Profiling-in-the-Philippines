@@ -196,7 +196,7 @@ export default function PredictionPage() {
         region:               formData.region ? parseInt(formData.region) : null,
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clustering-for-post-tropical-cyclone.onrender.com'
       const response = await fetch(`${apiUrl}/predict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -262,7 +262,7 @@ export default function PredictionPage() {
     }
 
     setBulkLoading(true)
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clustering-for-post-tropical-cyclone.onrender.com'
     const results: BulkRow[] = []
 
     for (let i = 0; i < rows.length; i++) {
