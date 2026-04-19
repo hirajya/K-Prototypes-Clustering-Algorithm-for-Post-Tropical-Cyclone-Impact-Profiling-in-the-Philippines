@@ -762,7 +762,6 @@ export default function PhilippinesWeatherStationPage() {
                 alignItems: "flex-start",
                 gap: 6,
               }}>
-                <span>🗺️</span>
                 <span>
                   <strong style={{ color: "#f59e0b" }}>Amber markers</strong> weather stations have specific geographic disclaimers.{" "}
                   <strong style={{ color: "#2563eb" }}>Blue markers</strong> are municipalities. Click any marker for details.
