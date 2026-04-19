@@ -34,6 +34,8 @@ interface FormData {
   totally_damaged: string;
   partially_damaged: string;
   cost: string;
+  start_datetime?: string;
+  end_datetime?: string;
   duration_hrs: string;
   max_sustained_wind: string;
   max_24hr_rainfall: string;
@@ -78,6 +80,8 @@ const initialFormData: FormData = {
   totally_damaged: "",
   partially_damaged: "",
   cost: "",
+  start_datetime: "",
+  end_datetime: "",
   duration_hrs: "",
   max_sustained_wind: "",
   max_24hr_rainfall: "",
@@ -141,6 +145,24 @@ export default function ClusterPage() {
   ) => {
     const { name, value } = e.target;
     const updatedFormData = { ...formData, [name]: value };
+
+    if (name === "start_datetime" || name === "end_datetime") {
+      const startStr = updatedFormData.start_datetime;
+      const endStr = updatedFormData.end_datetime;
+      if (startStr && endStr) {
+        const start = new Date(startStr);
+        const end = new Date(endStr);
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+          const diffMs = end.getTime() - start.getTime();
+          if (diffMs > 0) {
+            updatedFormData.duration_hrs = (diffMs / (1000 * 60 * 60)).toFixed(2);
+          } else {
+            updatedFormData.duration_hrs = "";
+          }
+        }
+      }
+    }
+
     setFormData(updatedFormData);
 
     // Re-validate form in real-time
@@ -191,11 +213,17 @@ export default function ClusterPage() {
     const duration = parseFloat(data.duration_hrs);
     if (!data.duration_hrs || isNaN(duration) || duration <= 0) {
       errors.duration_hrs =
-        "Duration is required and must be greater than 0 hours";
+        "Duration is required and must be greater than 0 hours. Please provide valid Start and End Datetimes.";
     } else if (duration > 720) {
       // 30 days
       errors.duration_hrs =
         "Duration exceeds typical typhoon lifespan (30 days)";
+    }
+
+    const startObj = data.start_datetime ? new Date(data.start_datetime) : null;
+    const endObj = data.end_datetime ? new Date(data.end_datetime) : null;
+    if (startObj && endObj && endObj <= startObj) {
+      errors.end_datetime = "End datetime must be after start datetime";
     }
 
     // Pressure validation: must be > 0
@@ -1360,6 +1388,34 @@ export default function ClusterPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Start Datetime
+                      </label>
+                      <input
+                        type="datetime-local"
+                        name="start_datetime"
+                        value={formData.start_datetime || ""}
+                        onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 border-gray-300`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        End Datetime
+                      </label>
+                      <input
+                        type="datetime-local"
+                        name="end_datetime"
+                        value={formData.end_datetime || ""}
+                        onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                          validationErrors.end_datetime
+                            ? "border-red-500"
+                            : "border-gray-300"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
                         Duration (hrs)
                       </label>
                       <input
@@ -1367,12 +1423,13 @@ export default function ClusterPage() {
                         name="duration_hrs"
                         value={formData.duration_hrs}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50 ${
                           validationErrors.duration_hrs
                             ? "border-red-500"
                             : "border-gray-300"
                         }`}
                         placeholder="0"
+                        readOnly
                       />
                     </div>
                     <div>
@@ -1553,20 +1610,28 @@ export default function ClusterPage() {
                     </div>
 
                     {/* Key Input Metrics Summary */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-center">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-center flex flex-col justify-center">
+                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Start Date</div>
+                        <div className="text-sm font-semibold text-blue-900">{formData.start_datetime ? new Date(formData.start_datetime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}</div>
+                      </div>
+                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-center flex flex-col justify-center">
+                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">End Date</div>
+                        <div className="text-sm font-semibold text-blue-900">{formData.end_datetime ? new Date(formData.end_datetime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}</div>
+                      </div>
+                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-center flex flex-col justify-center">
                         <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Duration</div>
                         <div className="text-lg font-semibold text-blue-900">{formData.duration_hrs} <span className="text-sm font-normal text-blue-700">hrs</span></div>
                       </div>
-                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-center">
+                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-center flex flex-col justify-center">
                         <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">TC Class</div>
                         <div className="text-lg font-semibold text-blue-900">{typhoonClassification.label.split(' - ')[0]}</div>
                       </div>
-                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-center">
+                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-center flex flex-col justify-center">
                         <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Region</div>
                         <div className="text-lg font-semibold text-blue-900">{formData.region}</div>
                       </div>
-                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-center">
+                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-center flex flex-col justify-center">
                         <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Total Rainfall</div>
                         <div className="text-lg font-semibold text-blue-900">{parseFloat(formData.max_24hr_rainfall || "0") + parseFloat(formData.total_storm_rainfall || "0")} <span className="text-sm font-normal text-blue-700">mm</span></div>
                       </div>
