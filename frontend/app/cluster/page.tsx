@@ -1552,6 +1552,26 @@ export default function ClusterPage() {
                       </div>
                     </div>
 
+                    {/* Key Input Metrics Summary */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-center">
+                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Duration</div>
+                        <div className="text-lg font-semibold text-blue-900">{formData.duration_hrs} <span className="text-sm font-normal text-blue-700">hrs</span></div>
+                      </div>
+                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-center">
+                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">TC Class</div>
+                        <div className="text-lg font-semibold text-blue-900">{typhoonClassification.label.split(' - ')[0]}</div>
+                      </div>
+                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-center">
+                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Region</div>
+                        <div className="text-lg font-semibold text-blue-900">{formData.region}</div>
+                      </div>
+                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-center">
+                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Total Rainfall</div>
+                        <div className="text-lg font-semibold text-blue-900">{parseFloat(formData.max_24hr_rainfall || "0") + parseFloat(formData.total_storm_rainfall || "0")} <span className="text-sm font-normal text-blue-700">mm</span></div>
+                      </div>
+                    </div>
+
                     {/* Single Prediction Charts */}
                     {(() => {
                       const chartData = getSinglePredictionChartData();
