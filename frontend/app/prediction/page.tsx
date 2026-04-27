@@ -31,6 +31,8 @@ interface FormData {
   min_pressure: string
   duration: string
   region: string
+  start_datetime: string
+  end_datetime: string
 }
 
 const initialFormData: FormData = {
@@ -40,14 +42,15 @@ const initialFormData: FormData = {
   min_pressure: '',
   duration: '',
   region: '',
+  start_datetime: '',
+  end_datetime: '',
 }
 
-// Only regions present in the training data
 const VALID_REGIONS = [
-  { value: '2',  label: 'Region 2 – Cagayan Valley' },
-  { value: '3',  label: 'Region 3 – Central Luzon' },
-  { value: '5',  label: 'Region 5 – Bicol Region' },
-  { value: '8',  label: 'Region 8 – Eastern Visayas' },
+  { value: '2', label: 'Region 2 – Cagayan Valley' },
+  { value: '3', label: 'Region 3 – Central Luzon' },
+  { value: '5', label: 'Region 5 – Bicol Region' },
+  { value: '8', label: 'Region 8 – Eastern Visayas' },
 ]
 
 const getTyphoonType = (maxSustainedWind: number): { type: number; label: string } => {
@@ -56,6 +59,12 @@ const getTyphoonType = (maxSustainedWind: number): { type: number; label: string
   else if (maxSustainedWind >= 89)  return { type: 2, label: 'STS - Severe Tropical Storm' }
   else if (maxSustainedWind >= 62)  return { type: 0, label: 'TS - Tropical Storm' }
   else return { type: 1, label: 'TD - Tropical Depression' }
+}
+
+const calcDurationHrs = (start: string, end: string): number => {
+  if (!start || !end) return 0
+  const diff = new Date(end).getTime() - new Date(start).getTime()
+  return diff > 0 ? parseFloat((diff / (1000 * 60 * 60)).toFixed(2)) : 0
 }
 
 const getSeverityBorder = (cluster: number) => {
@@ -82,7 +91,6 @@ const getSeverityDesc = (cluster: number) => {
   return 'text-green-700'
 }
 
-// Custom label rendered above each bar
 const BarLabel = (props: { x?: number; y?: number; width?: number; value?: number }) => {
   const { x = 0, y = 0, width = 0, value = 0 } = props
   return (
@@ -117,6 +125,10 @@ export default function PredictionPage() {
     const wind = parseFloat(formData.max_sustained_wind) || 0
     return getTyphoonType(wind)
   }, [formData.max_sustained_wind])
+
+  const computedDuration = useMemo(() => {
+    return calcDurationHrs(formData.start_datetime, formData.end_datetime)
+  }, [formData.start_datetime, formData.end_datetime])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -162,9 +174,21 @@ export default function PredictionPage() {
       errors.min_pressure = 'Pressure must not exceed 1100 hPa'
     }
 
-    const duration = parseFloat(data.duration)
-    if (data.duration && !isNaN(duration) && duration < 0) {
-      errors.duration = 'Duration cannot be negative'
+    if (data.start_datetime && data.end_datetime) {
+      const start = new Date(data.start_datetime)
+      const end = new Date(data.end_datetime)
+      if (end <= start) {
+        errors.end_datetime = 'End datetime must be after start datetime'
+      } else if (calcDurationHrs(data.start_datetime, data.end_datetime) > 720) {
+        errors.end_datetime = 'Duration exceeds typical typhoon lifespan (30 days)'
+      }
+    } else {
+      if (!data.start_datetime) errors.start_datetime = 'Start datetime is required'
+      if (!data.end_datetime) errors.end_datetime = 'End datetime is required'
+    }
+
+    if (!data.region) {
+      errors.region = 'Region is required for accurate severity prediction'
     }
 
     if (!data.region) {
@@ -191,7 +215,7 @@ export default function PredictionPage() {
         max_24hr_rainfall:    parseFloat(formData.max_24hr_rainfall) || 0,
         total_storm_rainfall: parseFloat(formData.total_storm_rainfall) || 0,
         min_pressure:         parseFloat(formData.min_pressure) || 0,
-        duration:             parseFloat(formData.duration) || 0,
+        duration:             computedDuration,
         typhoon_type:         typhoonClassification.type,
         region:               formData.region ? parseInt(formData.region) : null,
       }
@@ -487,15 +511,44 @@ export default function PredictionPage() {
                       {validationErrors.min_pressure && <p className="text-red-500 text-xs mt-1">{validationErrors.min_pressure}</p>}
                     </div>
 
-                    {/* Duration */}
+                    {/* Start & End Datetime */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Start Datetime</label>
+                        <input
+                          type="datetime-local"
+                          name="start_datetime"
+                          value={formData.start_datetime}
+                          onChange={handleInputChange}
+                          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.start_datetime ? 'border-red-500' : 'border-gray-300'}`}
+                        />
+                        {validationErrors.start_datetime && <p className="text-red-500 text-xs mt-1">{validationErrors.start_datetime}</p>}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">End Datetime</label>
+                        <input
+                          type="datetime-local"
+                          name="end_datetime"
+                          value={formData.end_datetime}
+                          min={formData.start_datetime || undefined}
+                          onChange={handleInputChange}
+                          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.end_datetime ? 'border-red-500' : 'border-gray-300'}`}
+                        />
+                        {validationErrors.end_datetime && <p className="text-red-500 text-xs mt-1">{validationErrors.end_datetime}</p>}
+                      </div>
+                    </div>
+
+                    {/* Duration — always read-only, driven by datetimes */}
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Duration (hours)</label>
-                      <input
-                        type="number" name="duration" value={formData.duration}
-                        onChange={handleInputChange} min="0" step="0.1"
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.duration ? 'border-red-500' : 'border-gray-300'}`}
-                      />
-                      {validationErrors.duration && <p className="text-red-500 text-xs mt-1">{validationErrors.duration}</p>}
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Duration (hours)
+                        {formData.start_datetime && formData.end_datetime && (
+                          <span className="ml-1 text-blue-500 font-normal">(auto-calculated)</span>
+                        )}
+                      </label>
+                      <div className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
+                        {computedDuration > 0 ? `${computedDuration} hrs` : '—'}
+                      </div>
                     </div>
 
                   </div>
@@ -550,7 +603,6 @@ export default function PredictionPage() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
-                        {/* Severity Cluster Card */}
                         <div className={`col-span-2 p-4 rounded-lg border-2 ${getSeverityBorder(result.severity_cluster)}`}>
                           <p className="text-xs font-medium mb-2" style={{ color: result.severity_cluster === 1 ? '#991b1b' : result.severity_cluster === 2 ? '#9a3412' : '#14532d' }}>Predicted Severity Level</p>
                           <div className="flex items-center gap-3">
@@ -617,19 +669,18 @@ export default function PredictionPage() {
               </div>
             </div>
 
-            {/* ── Charts with value labels on top of bars ── */}
+            {/* Charts */}
             {result && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                {/* People Affected */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">People Affected</h3>
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart
                       data={[
-                        { name: 'Families', value: result.families },
-                        { name: 'Persons',  value: result.persons },
-                        { name: 'Barangays',value: result.barangays },
+                        { name: 'Families',  value: result.families },
+                        { name: 'Persons',   value: result.persons },
+                        { name: 'Barangays', value: result.barangays },
                       ]}
                       margin={{ top: 20, right: 10, left: 10, bottom: 0 }}
                     >
@@ -646,7 +697,6 @@ export default function PredictionPage() {
                   </ResponsiveContainer>
                 </div>
 
-                {/* Casualties */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Casualties</h3>
                   <ResponsiveContainer width="100%" height={220}>
@@ -671,7 +721,6 @@ export default function PredictionPage() {
                   </ResponsiveContainer>
                 </div>
 
-                {/* Housing Damage */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Housing Damage</h3>
                   <ResponsiveContainer width="100%" height={220}>
@@ -717,7 +766,6 @@ export default function PredictionPage() {
                 </button>
               </div>
 
-              {/* Dropzone */}
               <label
                 htmlFor="csv-upload"
                 className="flex flex-col items-center justify-center w-full h-44 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors mb-6"
@@ -737,7 +785,6 @@ export default function PredictionPage() {
                 />
               </label>
 
-              {/* Required columns info */}
               <div className="bg-blue-50 rounded-xl border border-blue-100 p-4">
                 <p className="text-sm font-semibold text-blue-900 mb-1">Required Columns:</p>
                 <p className="text-sm text-blue-700 leading-relaxed">
