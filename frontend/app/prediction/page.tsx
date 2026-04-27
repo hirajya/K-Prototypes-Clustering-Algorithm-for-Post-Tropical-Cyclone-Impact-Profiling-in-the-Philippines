@@ -191,6 +191,10 @@ export default function PredictionPage() {
       errors.region = 'Region is required for accurate severity prediction'
     }
 
+    if (!data.region) {
+      errors.region = 'Region is required for accurate severity prediction'
+    }
+
     setValidationErrors(errors)
     return Object.keys(errors).length === 0
   }
