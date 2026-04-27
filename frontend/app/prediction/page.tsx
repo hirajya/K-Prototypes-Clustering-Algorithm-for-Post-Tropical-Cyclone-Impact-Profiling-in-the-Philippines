@@ -538,12 +538,9 @@ export default function PredictionPage() {
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Duration (hours)
-                        {formData.start_datetime && formData.end_datetime && (
-                          <span className="ml-1 text-blue-500 font-normal">(auto-calculated)</span>
-                        )}
                       </label>
                       <div className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
-                        {computedDuration > 0 ? `${computedDuration} hrs` : '—'}
+                        {computedDuration > 0 ? `${computedDuration} hrs` : '0'}
                       </div>
                     </div>
 
