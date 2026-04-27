@@ -91,6 +91,17 @@ const getSeverityDesc = (cluster: number) => {
   return 'text-green-700'
 }
 
+const formatDatetime = (dt: string): string => {
+  if (!dt) return '—'
+  return new Date(dt).toLocaleString('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 const BarLabel = (props: { x?: number; y?: number; width?: number; value?: number }) => {
   const { x = 0, y = 0, width = 0, value = 0 } = props
   return (
@@ -114,6 +125,9 @@ export default function PredictionPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+
+  // Snapshot of datetime values at the time of submission
+  const [submittedDatetimes, setSubmittedDatetimes] = useState<{ start: string; end: string } | null>(null)
 
   const [bulkRows, setBulkRows] = useState<BulkRow[]>([])
   const [bulkLoading, setBulkLoading] = useState(false)
@@ -208,6 +222,7 @@ export default function PredictionPage() {
     setLoading(true)
     setError('')
     setResult(null)
+    setSubmittedDatetimes(null)
 
     try {
       const payload = {
@@ -234,6 +249,8 @@ export default function PredictionPage() {
 
       const data: ForecastResult = await response.json()
       setResult(data)
+      // Snapshot the datetimes used for this prediction
+      setSubmittedDatetimes({ start: formData.start_datetime, end: formData.end_datetime })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect to the server.')
     } finally {
@@ -246,6 +263,7 @@ export default function PredictionPage() {
     setResult(null)
     setError('')
     setValidationErrors({})
+    setSubmittedDatetimes(null)
   }
 
   const parseCSV = (text: string): Record<string, string>[] => {
@@ -591,6 +609,36 @@ export default function PredictionPage() {
 
                   {result ? (
                     <div className="space-y-6">
+
+                      {/* ── Typhoon Period Summary ── */}
+                      {submittedDatetimes && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Typhoon Period</p>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3 text-center">
+                            <div>
+                              <p className="text-xs text-gray-500 mb-1">Start</p>
+                              <p className="text-xs font-semibold text-gray-800 leading-snug">{formatDatetime(submittedDatetimes.start)}</p>
+                            </div>
+                            <div className="flex flex-col items-center justify-center">
+                              <svg className="w-4 h-4 text-gray-400 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                              </svg>
+                              <p className="text-xs text-gray-500 mb-0.5">Duration</p>
+                              <p className="text-sm font-bold text-blue-700">{calcDurationHrs(submittedDatetimes.start, submittedDatetimes.end)} hrs</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500 mb-1">End</p>
+                              <p className="text-xs font-semibold text-gray-800 leading-snug">{formatDatetime(submittedDatetimes.end)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       <div className={`p-5 rounded-xl border-2 ${getSeverityBorder(result.severity_cluster)}`}>
                         <div className="flex items-center gap-3 mb-2">
                           <p className={`text-lg font-bold ${getSeverityText(result.severity_cluster)}`}>
