@@ -1,14 +1,12 @@
 'use client'
-
 import { useState, useMemo } from 'react'
 
-// Updated to match the FastAPI ForecastResponse model exactly
 interface ForecastResult {
   families: number
   persons: number
   barangays: number
   dead: number
-  injured: number // Backend returns 'injured', not 'injured_ill'
+  injured: number
   missing: number
   partially_damaged: number
   totally_damaged: number
@@ -20,7 +18,8 @@ interface FormData {
   max_24hr_rainfall: string
   total_storm_rainfall: string
   min_pressure: string
-  duration: string
+  start_datetime: string
+  end_datetime: string
 }
 
 const initialFormData: FormData = {
@@ -28,22 +27,22 @@ const initialFormData: FormData = {
   max_24hr_rainfall: '',
   total_storm_rainfall: '',
   min_pressure: '',
-  duration: '',
+  start_datetime: '',
+  end_datetime: '',
 }
 
-// Auto-classify typhoon type based on max sustained wind
 const getTyphoonType = (maxSustainedWind: number): { type: number; label: string } => {
-  if (maxSustainedWind > 184) {
-    return { type: 4, label: 'STY - Super Typhoon' }
-  } else if (maxSustainedWind >= 118) {
-    return { type: 3, label: 'TY - Typhoon' }
-  } else if (maxSustainedWind >= 89) {
-    return { type: 2, label: 'STS - Severe Tropical Storm' }
-  } else if (maxSustainedWind >= 62) {
-    return { type: 0, label: 'TS - Tropical Storm' }
-  } else {
-    return { type: 1, label: 'TD - Tropical Depression' }
-  }
+  if (maxSustainedWind > 184) return { type: 4, label: 'STY - Super Typhoon' }
+  else if (maxSustainedWind >= 118) return { type: 3, label: 'TY - Typhoon' }
+  else if (maxSustainedWind >= 89) return { type: 2, label: 'STS - Severe Tropical Storm' }
+  else if (maxSustainedWind >= 62) return { type: 0, label: 'TS - Tropical Storm' }
+  else return { type: 1, label: 'TD - Tropical Depression' }
+}
+
+const calcDurationHrs = (start: string, end: string): number => {
+  if (!start || !end) return 0
+  const diff = new Date(end).getTime() - new Date(start).getTime()
+  return diff > 0 ? parseFloat((diff / (1000 * 60 * 60)).toFixed(2)) : 0
 }
 
 export default function PredictionPage() {
@@ -53,25 +52,25 @@ export default function PredictionPage() {
   const [error, setError] = useState('')
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
 
-  // Auto-detect typhoon type based on max sustained wind
   const typhoonClassification = useMemo(() => {
     const wind = parseFloat(formData.max_sustained_wind) || 0
     return getTyphoonType(wind)
   }, [formData.max_sustained_wind])
 
+  const computedDuration = useMemo(() => {
+    return calcDurationHrs(formData.start_datetime, formData.end_datetime)
+  }, [formData.start_datetime, formData.end_datetime])
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     const updatedFormData = { ...formData, [name]: value }
     setFormData(updatedFormData)
-    
-    // Re-validate form in real-time
     validateFormData(updatedFormData)
   }
 
   const validateFormData = (data: FormData): boolean => {
     const errors: Record<string, string> = {}
-    
-    // Max Sustained Wind validation
+
     const wind = parseFloat(data.max_sustained_wind)
     if (!data.max_sustained_wind || isNaN(wind) || wind <= 0) {
       errors.max_sustained_wind = 'Wind speed is required and must be greater than 0'
@@ -81,26 +80,22 @@ export default function PredictionPage() {
       errors.max_sustained_wind = 'Wind speed must not exceed 500 kph'
     }
 
-    // Max 24hr Rainfall validation
     const rainfall24 = parseFloat(data.max_24hr_rainfall)
     if (!data.max_24hr_rainfall || isNaN(rainfall24) || rainfall24 < 0) {
       errors.max_24hr_rainfall = 'Max 24hr rainfall is required and cannot be negative'
     }
 
-    // Total Storm Rainfall validation
     const rainfallTotal = parseFloat(data.total_storm_rainfall)
     if (!data.total_storm_rainfall || isNaN(rainfallTotal) || rainfallTotal < 0) {
       errors.total_storm_rainfall = 'Total storm rainfall is required and cannot be negative'
     }
 
-    // Check that max 24hr rainfall is less than total rainfall
     if (!isNaN(rainfall24) && !isNaN(rainfallTotal) && rainfall24 >= 0 && rainfallTotal >= 0) {
       if (rainfall24 > rainfallTotal) {
         errors.max_24hr_rainfall = 'Max 24hr rainfall must be less than or equal to total rainfall'
       }
     }
 
-    // Min Pressure validation
     const pressure = parseFloat(data.min_pressure)
     if (!data.min_pressure || isNaN(pressure) || pressure <= 0) {
       errors.min_pressure = 'Pressure is required and must be greater than 0'
@@ -110,10 +105,17 @@ export default function PredictionPage() {
       errors.min_pressure = 'Pressure must not exceed 1100 hPa'
     }
 
-    // Duration validation
-    const duration = parseFloat(data.duration)
-    if (data.duration && (!isNaN(duration) && duration < 0)) {
-      errors.duration = 'Duration cannot be negative'
+    if (data.start_datetime && data.end_datetime) {
+      const start = new Date(data.start_datetime)
+      const end = new Date(data.end_datetime)
+      if (end <= start) {
+        errors.end_datetime = 'End datetime must be after start datetime'
+      } else if (calcDurationHrs(data.start_datetime, data.end_datetime) > 720) {
+        errors.end_datetime = 'Duration exceeds typical typhoon lifespan (30 days)'
+      }
+    } else {
+      if (!data.start_datetime) errors.start_datetime = 'Start datetime is required'
+      if (!data.end_datetime) errors.end_datetime = 'End datetime is required'
     }
 
     setValidationErrors(errors)
@@ -122,29 +124,25 @@ export default function PredictionPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    // Validate before submitting
     if (!validateFormData(formData)) {
       setError('Please fix validation errors before submitting')
       return
     }
-    
+
     setLoading(true)
     setError('')
     setResult(null)
 
     try {
-      // Prepare Payload matching ForecastInput in FastAPI
       const payload = {
         max_sustained_wind: parseFloat(formData.max_sustained_wind) || 0,
         max_24hr_rainfall: parseFloat(formData.max_24hr_rainfall) || 0,
         total_storm_rainfall: parseFloat(formData.total_storm_rainfall) || 0,
         min_pressure: parseFloat(formData.min_pressure) || 0,
-        duration: parseFloat(formData.duration) || 0,
-        typhoon_type: typhoonClassification.type, 
+        duration: computedDuration,
+        typhoon_type: typhoonClassification.type,
       }
 
-      // Use the correct prediction endpoint
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clustering-for-post-tropical-cyclone.onrender.com'
       const response = await fetch(`${apiUrl}/predict`, {
         method: 'POST',
@@ -188,8 +186,10 @@ export default function PredictionPage() {
           <div>
             <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-6">Input Weather Features</h2>
-              
+
               <div className="space-y-6">
+
+                {/* Max Sustained Wind */}
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Max Sustained Wind (kph)</label>
                   <input
@@ -210,6 +210,7 @@ export default function PredictionPage() {
                   )}
                 </div>
 
+                {/* TC Classification */}
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Typhoon Classification</label>
                   <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
@@ -218,6 +219,7 @@ export default function PredictionPage() {
                   <p className="text-xs text-gray-500 mt-1">Auto-detected based on max sustained wind</p>
                 </div>
 
+                {/* Max 24hr Rainfall */}
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Max 24hr Rainfall (mm)</label>
                   <input
@@ -237,6 +239,7 @@ export default function PredictionPage() {
                   )}
                 </div>
 
+                {/* Total Storm Rainfall */}
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Total Storm Rainfall (mm)</label>
                   <input
@@ -256,6 +259,7 @@ export default function PredictionPage() {
                   )}
                 </div>
 
+                {/* Min Pressure */}
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Min Pressure (hPa)</label>
                   <input
@@ -276,31 +280,63 @@ export default function PredictionPage() {
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Duration (hours)</label>
-                  <input
-                    type="number"
-                    name="duration"
-                    value={formData.duration}
-                    onChange={handleInputChange}
-                    min="0"
-                    step="0.1"
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-cyan-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                      validationErrors.duration ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  />
-                  {validationErrors.duration && (
-                    <p className="text-red-500 text-xs mt-1">{validationErrors.duration}</p>
-                  )}
+                {/* Start & End Datetime */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Start Datetime</label>
+                    <input
+                      type="datetime-local"
+                      name="start_datetime"
+                      value={formData.start_datetime}
+                      onChange={handleInputChange}
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-cyan-500 ${
+                        validationErrors.start_datetime ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                    {validationErrors.start_datetime && (
+                      <p className="text-red-500 text-xs mt-1">{validationErrors.start_datetime}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">End Datetime</label>
+                    <input
+                      type="datetime-local"
+                      name="end_datetime"
+                      value={formData.end_datetime}
+                      min={formData.start_datetime || undefined}
+                      onChange={handleInputChange}
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-cyan-500 ${
+                        validationErrors.end_datetime ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                    {validationErrors.end_datetime && (
+                      <p className="text-red-500 text-xs mt-1">{validationErrors.end_datetime}</p>
+                    )}
+                  </div>
                 </div>
+
+                {/* Duration - always read-only */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Duration (hours)
+                    {formData.start_datetime && formData.end_datetime && (
+                      <span className="ml-1 text-cyan-500 font-normal">(auto-calculated)</span>
+                    )}
+                  </label>
+                  <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
+                    {computedDuration > 0 ? `${computedDuration} hrs` : '—'}
+                  </div>
+                </div>
+
               </div>
 
+              {/* Validation error summary */}
               {Object.keys(validationErrors).length > 0 && (
                 <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-red-700 text-sm font-semibold">Please fix the following errors:</p>
                   <ul className="list-disc list-inside text-red-600 text-sm mt-2">
-                    {Object.values(validationErrors).map((error, idx) => (
-                      <li key={idx}>{error}</li>
+                    {Object.values(validationErrors).map((err, idx) => (
+                      <li key={idx}>{err}</li>
                     ))}
                   </ul>
                 </div>
@@ -343,10 +379,8 @@ export default function PredictionPage() {
 
               {result ? (
                 <div className="space-y-6">
-                  {/* Display prediction results */}
                   <div className="space-y-3">
                     <h3 className="font-semibold text-gray-800 text-sm">Estimated Impact Breakdown:</h3>
-                    
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
                         <p className="text-xs text-blue-600 font-medium mb-1">Families Affected</p>
@@ -382,7 +416,6 @@ export default function PredictionPage() {
                       </div>
                     </div>
                   </div>
-
                   {result.message && (
                     <div className="text-xs text-green-600 bg-green-50 p-3 rounded-lg border border-green-100">
                       ✓ {result.message}
