@@ -62,13 +62,51 @@ interface BulkDataRow {
   region: number;
   impact_level?: string;
   cluster?: number;
-  rowNumber?: number; // Track original row number
+  rowNumber?: number;
 }
 
 interface ValidationError {
   rowNumber: number;
   errors: string[];
 }
+
+// ─── Shape saved to localStorage ───────────────────────────────────────────
+interface ImpactProfileSnapshot {
+  severity_cluster: number;
+  severity_label: string;
+  families: number;
+  persons: number;
+  barangays: number;
+  dead: number;
+  injured: number;
+  missing: number;
+  totally_damaged: number;
+  partially_damaged: number;
+  // batch: array of per-row snapshots (used to override batch prediction)
+  batchSnapshots?: {
+    severity_cluster: number;
+    severity_label: string;
+    families: number;
+    persons: number;
+    barangays: number;
+    dead: number;
+    injured: number;
+    missing: number;
+    totally_damaged: number;
+    partially_damaged: number;
+  }[];
+}
+
+const IMPACT_PROFILE_KEY = "impactProfileSnapshot";
+
+const saveImpactSnapshot = (snapshot: ImpactProfileSnapshot) => {
+  try {
+    localStorage.setItem(IMPACT_PROFILE_KEY, JSON.stringify(snapshot));
+  } catch {
+    // silently fail if localStorage is unavailable
+  }
+};
+// ───────────────────────────────────────────────────────────────────────────
 
 const initialFormData: FormData = {
   families: "",
@@ -90,7 +128,6 @@ const initialFormData: FormData = {
   region: "2",
 };
 
-// Auto-classify typhoon type based on max sustained wind
 const getTyphoonType = (
   maxSustainedWind: number
 ): { type: number; label: string } => {
@@ -123,7 +160,6 @@ export default function ClusterPage() {
     Record<string, string>
   >({});
 
-  // Bulk prediction states
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkData, setBulkData] = useState<BulkDataRow[]>([]);
   const [bulkResults, setBulkResults] = useState<BulkDataRow[]>([]);
@@ -134,7 +170,6 @@ export default function ClusterPage() {
   >([]);
   const [missingColumns, setMissingColumns] = useState<string[]>([]);
 
-  // Auto-detect typhoon type based on max sustained wind
   const typhoonClassification = useMemo(() => {
     const wind = parseFloat(formData.max_sustained_wind) || 0;
     return getTyphoonType(wind);
@@ -164,15 +199,12 @@ export default function ClusterPage() {
     }
 
     setFormData(updatedFormData);
-
-    // Re-validate form in real-time
     validateFormData(updatedFormData);
   };
 
   const validateFormData = (data: FormData): boolean => {
     const errors: Record<string, string> = {};
 
-    // Check all required fields are filled
     const requiredFields = [
       { key: "families", label: "Families Affected" },
       { key: "persons", label: "Persons Affected" },
@@ -197,7 +229,6 @@ export default function ClusterPage() {
       }
     });
 
-    // Wind speed validation: must be provided and > 0, with domain bounds
     const wind = parseFloat(data.max_sustained_wind);
     if (!data.max_sustained_wind || isNaN(wind) || wind <= 0) {
       errors.max_sustained_wind =
@@ -209,13 +240,11 @@ export default function ClusterPage() {
       }
     }
 
-    // Duration validation: must be > 0
     const duration = parseFloat(data.duration_hrs);
     if (!data.duration_hrs || isNaN(duration) || duration <= 0) {
       errors.duration_hrs =
         "Duration is required and must be greater than 0 hours. Please provide valid Start and End Datetimes.";
     } else if (duration > 720) {
-      // 30 days
       errors.duration_hrs =
         "Duration exceeds typical typhoon lifespan (30 days)";
     }
@@ -226,7 +255,6 @@ export default function ClusterPage() {
       errors.end_datetime = "End datetime must be after start datetime";
     }
 
-    // Pressure validation: must be > 0
     const pressure = parseFloat(data.min_pressure);
     if (!data.min_pressure || isNaN(pressure) || pressure <= 0) {
       errors.min_pressure =
@@ -236,7 +264,6 @@ export default function ClusterPage() {
         "Pressure must be between 870-1100 hPa (typical typhoon range)";
     }
 
-    // Rainfall validation: must be > 0
     const rainfall24 = parseFloat(data.max_24hr_rainfall);
     if (!data.max_24hr_rainfall || isNaN(rainfall24) || rainfall24 <= 0) {
       errors.max_24hr_rainfall =
@@ -258,7 +285,6 @@ export default function ClusterPage() {
       errors.total_storm_rainfall = "Total rainfall seems unrealistic";
     }
 
-    // Total storm rainfall should not be less than maximum 24-hour rainfall
     if (
       !isNaN(rainfall24) &&
       !isNaN(rainfallTotal) &&
@@ -270,7 +296,6 @@ export default function ClusterPage() {
         "Total Storm Rainfall cannot be less than Max 24hr Rainfall";
     }
 
-    // Casualty validation (casualties should not exceed persons affected)
     const persons = parseFloat(data.persons) || 0;
     const dead = parseFloat(data.dead) || 0;
     const injured = parseFloat(data.injured_ill) || 0;
@@ -280,7 +305,6 @@ export default function ClusterPage() {
       errors.persons = "Total casualties cannot exceed persons affected";
     }
 
-    // Houses validation
     const totallyDamaged = parseFloat(data.totally_damaged) || 0;
     const partiallyDamaged = parseFloat(data.partially_damaged) || 0;
     const families = parseFloat(data.families) || 0;
@@ -301,18 +325,10 @@ export default function ClusterPage() {
   const validateBulkRow = (row: BulkDataRow, rowIndex: number): string[] => {
     const errors: string[] = [];
 
-    // Check for required fields
-    if (!row.families || row.families < 0) {
-      errors.push("Families must be >= 0");
-    }
-    if (!row.persons || row.persons < 0) {
-      errors.push("Persons must be >= 0");
-    }
-    if (!row.barangays || row.barangays < 0) {
-      errors.push("Barangays must be >= 0");
-    }
+    if (!row.families || row.families < 0) errors.push("Families must be >= 0");
+    if (!row.persons || row.persons < 0) errors.push("Persons must be >= 0");
+    if (!row.barangays || row.barangays < 0) errors.push("Barangays must be >= 0");
 
-    // Wind speed validation
     const wind = row.max_sustained_wind;
     if (!wind || wind <= 0) {
       errors.push("Wind speed is required and must be > 0 km/h");
@@ -320,7 +336,6 @@ export default function ClusterPage() {
       errors.push("Wind speed exceeds realistic maximum (500 km/h)");
     }
 
-    // Duration validation
     const duration = row.duration_hrs;
     if (!duration || duration <= 0) {
       errors.push("Duration must be > 0 hours");
@@ -328,7 +343,6 @@ export default function ClusterPage() {
       errors.push("Duration exceeds typical typhoon lifespan (30 days)");
     }
 
-    // Pressure validation
     const pressure = row.min_pressure;
     if (!pressure || pressure <= 0) {
       errors.push("Pressure is required and must be > 0 hPa");
@@ -336,7 +350,6 @@ export default function ClusterPage() {
       errors.push("Pressure must be between 870-1100 hPa");
     }
 
-    // Rainfall validation
     const rainfall24 = row.max_24hr_rainfall;
     if (!rainfall24 || rainfall24 <= 0) {
       errors.push("24hr Rainfall must be > 0 mm");
@@ -351,12 +364,10 @@ export default function ClusterPage() {
       errors.push("Total Rainfall seems unrealistic");
     }
 
-    // Total rainfall should be >= 24hr rainfall
     if (rainfall24 > 0 && rainfallTotal > 0 && rainfallTotal < rainfall24) {
       errors.push("Total Rainfall cannot be less than 24hr Rainfall");
     }
 
-    // Casualty validation
     const persons = row.persons || 0;
     const dead = row.dead || 0;
     const injured = row.injured_ill || 0;
@@ -366,7 +377,6 @@ export default function ClusterPage() {
       errors.push("Total casualties exceed persons affected");
     }
 
-    // Houses validation
     const totallyDamaged = row.totally_damaged || 0;
     const partiallyDamaged = row.partially_damaged || 0;
     const families = row.families || 0;
@@ -375,7 +385,6 @@ export default function ClusterPage() {
       errors.push("Damaged houses seem disproportionate to families affected");
     }
 
-    // Region validation
     if (!row.region || ![2, 3, 5, 8].includes(row.region)) {
       errors.push("Region must be 2, 3, 5, or 8");
     }
@@ -404,35 +413,20 @@ export default function ClusterPage() {
           return;
         }
 
-        // Normalize column name for comparison
         const normalizeColumn = (col: string): string => {
           return col.toLowerCase().replace(/[^a-z0-9]/g, "");
         };
 
-        // Check for required columns
         const requiredColumns = [
-          "families",
-          "persons",
-          "barangays",
-          "dead",
-          "injured_ill",
-          "missing",
-          "totally_damaged",
-          "partially_damaged",
-          "cost",
-          "duration_hrs",
-          "max_sustained_wind",
-          "max_24hr_rainfall",
-          "total_storm_rainfall",
-          "min_pressure",
-          "region",
+          "families", "persons", "barangays", "dead", "injured_ill", "missing",
+          "totally_damaged", "partially_damaged", "cost", "duration_hrs",
+          "max_sustained_wind", "max_24hr_rainfall", "total_storm_rainfall",
+          "min_pressure", "region",
         ];
 
         const firstRow = jsonData[0];
         const actualColumns = Object.keys(firstRow);
-        const normalizedActualColumns = actualColumns.map(normalizeColumn);
 
-        // Map each required column to possible variations
         const columnMapping: Record<string, string[]> = {
           families: ["families"],
           persons: ["persons"],
@@ -445,46 +439,34 @@ export default function ClusterPage() {
           cost: ["cost", "costphp"],
           duration_hrs: ["durationhrs", "duration"],
           max_sustained_wind: ["maxsustainedwind", "maxwind", "wind"],
-          max_24hr_rainfall: [
-            "max24hrrainfall",
-            "rainfall24",
-            "rainfall24hr",
-            "24hrrainfall",
-          ],
+          max_24hr_rainfall: ["max24hrrainfall", "rainfall24", "rainfall24hr", "24hrrainfall"],
           total_storm_rainfall: ["totalstormrainfall", "totalrainfall"],
           min_pressure: ["minpressure", "pressure"],
           region: ["region"],
         };
 
         const missing: string[] = [];
-        const foundColumns: Record<string, string> = {}; // Map required column to actual column name
+        const foundColumns: Record<string, string> = {};
 
         requiredColumns.forEach((requiredCol) => {
-          const variations = columnMapping[requiredCol] || [
-            requiredCol.replace(/_/g, ""),
-          ];
+          const variations = columnMapping[requiredCol] || [requiredCol.replace(/_/g, "")];
           let found = false;
 
           for (const actualCol of actualColumns) {
             const normalizedActual = normalizeColumn(actualCol);
-            if (
-              variations.some((v) => normalizedActual === normalizeColumn(v))
-            ) {
+            if (variations.some((v) => normalizedActual === normalizeColumn(v))) {
               foundColumns[requiredCol] = actualCol;
               found = true;
               break;
             }
           }
 
-          if (!found) {
-            missing.push(requiredCol);
-          }
+          if (!found) missing.push(requiredCol);
         });
 
         if (missing.length > 0) {
           setMissingColumns(missing);
           setBulkError(`Missing required columns: ${missing.join(", ")}`);
-          // Clear previous data when columns are missing
           setBulkData([]);
           setBulkResults([]);
           setBulkValidationErrors([]);
@@ -493,7 +475,6 @@ export default function ClusterPage() {
 
         setMissingColumns([]);
 
-        // Map the Excel columns to our expected format using the found column mapping
         const mappedData: BulkDataRow[] = jsonData.map((row, index) => ({
           families: Number(row[foundColumns["families"]] || 0),
           persons: Number(row[foundColumns["persons"]] || 0),
@@ -502,34 +483,22 @@ export default function ClusterPage() {
           injured_ill: Number(row[foundColumns["injured_ill"]] || 0),
           missing: Number(row[foundColumns["missing"]] || 0),
           totally_damaged: Number(row[foundColumns["totally_damaged"]] || 0),
-          partially_damaged: Number(
-            row[foundColumns["partially_damaged"]] || 0
-          ),
+          partially_damaged: Number(row[foundColumns["partially_damaged"]] || 0),
           cost: Number(row[foundColumns["cost"]] || 0),
           duration_hrs: Number(row[foundColumns["duration_hrs"]] || 0),
-          max_sustained_wind: Number(
-            row[foundColumns["max_sustained_wind"]] || 0
-          ),
-          max_24hr_rainfall: Number(
-            row[foundColumns["max_24hr_rainfall"]] || 0
-          ),
-          total_storm_rainfall: Number(
-            row[foundColumns["total_storm_rainfall"]] || 0
-          ),
+          max_sustained_wind: Number(row[foundColumns["max_sustained_wind"]] || 0),
+          max_24hr_rainfall: Number(row[foundColumns["max_24hr_rainfall"]] || 0),
+          total_storm_rainfall: Number(row[foundColumns["total_storm_rainfall"]] || 0),
           min_pressure: Number(row[foundColumns["min_pressure"]] || 0),
           region: Number(row[foundColumns["region"]] || 2),
-          rowNumber: index + 2, // +2 because Excel is 1-indexed and has header row
+          rowNumber: index + 2,
         }));
 
-        // Validate all rows
         const errors: ValidationError[] = [];
         mappedData.forEach((row, index) => {
           const rowErrors = validateBulkRow(row, index);
           if (rowErrors.length > 0) {
-            errors.push({
-              rowNumber: row.rowNumber || index + 2,
-              errors: rowErrors,
-            });
+            errors.push({ rowNumber: row.rowNumber || index + 2, errors: rowErrors });
           }
         });
 
@@ -538,15 +507,12 @@ export default function ClusterPage() {
         setBulkResults([]);
 
         if (errors.length > 0) {
-          setBulkError(
-            `Found ${errors.length} row(s) with validation errors. Please review below.`
-          );
+          setBulkError(`Found ${errors.length} row(s) with validation errors. Please review below.`);
         } else {
           setBulkError("");
         }
       } catch (err) {
         setBulkError("Failed to parse file. Please check the format.");
-        // Clear all data on parse error
         setBulkData([]);
         setBulkResults([]);
         setBulkValidationErrors([]);
@@ -614,20 +580,48 @@ export default function ClusterPage() {
             impact_level: getClusterLabel(data.cluster),
           });
         } else {
-          results.push({
-            ...row,
-            cluster: -1,
-            impact_level: "Error",
-          });
+          results.push({ ...row, cluster: -1, impact_level: "Error" });
         }
       }
 
       setBulkResults(results);
+
+      // ─── Save batch snapshots to localStorage ────────────────────────────
+      const validResults = results.filter((r) => r.cluster !== undefined && r.cluster >= 0);
+      if (validResults.length > 0) {
+        // Use the first valid result as the primary snapshot,
+        // and store the full batch for per-row overrides.
+        const first = validResults[0];
+        const snapshot: ImpactProfileSnapshot = {
+          severity_cluster: first.cluster!,
+          severity_label: getClusterLabel(first.cluster!),
+          families: first.families,
+          persons: first.persons,
+          barangays: first.barangays,
+          dead: first.dead,
+          injured: first.injured_ill,
+          missing: first.missing,
+          totally_damaged: first.totally_damaged,
+          partially_damaged: first.partially_damaged,
+          batchSnapshots: validResults.map((r) => ({
+            severity_cluster: r.cluster!,
+            severity_label: getClusterLabel(r.cluster!),
+            families: r.families,
+            persons: r.persons,
+            barangays: r.barangays,
+            dead: r.dead,
+            injured: r.injured_ill,
+            missing: r.missing,
+            totally_damaged: r.totally_damaged,
+            partially_damaged: r.partially_damaged,
+          })),
+        };
+        saveImpactSnapshot(snapshot);
+      }
+      // ─────────────────────────────────────────────────────────────────────
     } catch (err) {
       setBulkError(
-        err instanceof Error
-          ? err.message
-          : "Failed to process bulk predictions"
+        err instanceof Error ? err.message : "Failed to process bulk predictions"
       );
     } finally {
       setBulkLoading(false);
@@ -637,38 +631,16 @@ export default function ClusterPage() {
   const handleDownloadTemplate = () => {
     const templateData = [
       {
-        families: 100,
-        persons: 450,
-        barangays: 5,
-        dead: 0,
-        injured_ill: 2,
-        missing: 0,
-        totally_damaged: 10,
-        partially_damaged: 25,
-        cost: 150000,
-        duration_hrs: 48,
-        max_sustained_wind: 120,
-        max_24hr_rainfall: 85,
-        total_storm_rainfall: 200,
-        min_pressure: 980,
-        region: 2,
+        families: 100, persons: 450, barangays: 5, dead: 0, injured_ill: 2,
+        missing: 0, totally_damaged: 10, partially_damaged: 25, cost: 150000,
+        duration_hrs: 48, max_sustained_wind: 120, max_24hr_rainfall: 85,
+        total_storm_rainfall: 200, min_pressure: 980, region: 2,
       },
       {
-        families: 250,
-        persons: 1200,
-        barangays: 8,
-        dead: 1,
-        injured_ill: 5,
-        missing: 0,
-        totally_damaged: 30,
-        partially_damaged: 60,
-        cost: 500000,
-        duration_hrs: 72,
-        max_sustained_wind: 150,
-        max_24hr_rainfall: 110,
-        total_storm_rainfall: 300,
-        min_pressure: 965,
-        region: 3,
+        families: 250, persons: 1200, barangays: 8, dead: 1, injured_ill: 5,
+        missing: 0, totally_damaged: 30, partially_damaged: 60, cost: 500000,
+        duration_hrs: 72, max_sustained_wind: 150, max_24hr_rainfall: 110,
+        total_storm_rainfall: 300, min_pressure: 965, region: 3,
       },
     ];
 
@@ -681,7 +653,6 @@ export default function ClusterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate before submitting
     if (!validateForm()) {
       setError("Please fix input before submitting");
       return;
@@ -727,6 +698,22 @@ export default function ClusterPage() {
 
       const data = await response.json();
       setResult(data);
+
+      // ─── Save instance snapshot to localStorage ───────────────────────
+      const snapshot: ImpactProfileSnapshot = {
+        severity_cluster: data.cluster,
+        severity_label: getClusterLabel(data.cluster),
+        families: parseFloat(formData.families) || 0,
+        persons: parseFloat(formData.persons) || 0,
+        barangays: parseFloat(formData.barangays) || 0,
+        dead: parseFloat(formData.dead) || 0,
+        injured: parseFloat(formData.injured_ill) || 0,
+        missing: parseFloat(formData.missing) || 0,
+        totally_damaged: parseFloat(formData.totally_damaged) || 0,
+        partially_damaged: parseFloat(formData.partially_damaged) || 0,
+      };
+      saveImpactSnapshot(snapshot);
+      // ─────────────────────────────────────────────────────────────────
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to connect to the server."
@@ -745,48 +732,34 @@ export default function ClusterPage() {
 
   const getClusterColor = (cluster: number) => {
     switch (cluster) {
-      case 0:
-        return "bg-green-500"; // Low Impact
-      case 1:
-        return "bg-red-500"; // High Impact
-      case 2:
-        return "bg-orange-500"; // Moderate Impact
-      default:
-        return "bg-gray-500";
+      case 0: return "bg-green-500";
+      case 1: return "bg-red-500";
+      case 2: return "bg-orange-500";
+      default: return "bg-gray-500";
     }
   };
 
   const getClusterBgColor = (cluster: number) => {
     switch (cluster) {
-      case 0:
-        return "bg-green-50 border-green-200"; // Low Impact
-      case 1:
-        return "bg-red-50 border-red-200"; // High Impact
-      case 2:
-        return "bg-orange-50 border-orange-200"; // Moderate Impact
-      default:
-        return "bg-gray-50 border-gray-200";
+      case 0: return "bg-green-50 border-green-200";
+      case 1: return "bg-red-50 border-red-200";
+      case 2: return "bg-orange-50 border-orange-200";
+      default: return "bg-gray-50 border-gray-200";
     }
   };
 
   const getClusterLabel = (cluster: number) => {
     switch (cluster) {
-      case 0:
-        return "Low Impact";
-      case 1:
-        return "High Impact";
-      case 2:
-        return "Moderate Impact";
-      default:
-        return "Unknown";
+      case 0: return "Low Impact";
+      case 1: return "High Impact";
+      case 2: return "Moderate Impact";
+      default: return "Unknown";
     }
   };
 
-  // Get typical ranges for each cluster based on historical data
   const getClusterRanges = () => {
     return {
       0: {
-        // Low Impact
         casualties: { min: 0, max: 5, avg: 1 },
         damaged: { min: 0, max: 50, avg: 15 },
         cost: { min: 0, max: 500000, avg: 100000 },
@@ -795,7 +768,6 @@ export default function ClusterPage() {
         pressure: { min: 980, max: 1010, avg: 995 },
       },
       1: {
-        // High Impact
         casualties: { min: 20, max: 200, avg: 80 },
         damaged: { min: 200, max: 2000, avg: 800 },
         cost: { min: 2000000, max: 50000000, avg: 15000000 },
@@ -804,7 +776,6 @@ export default function ClusterPage() {
         pressure: { min: 900, max: 970, avg: 940 },
       },
       2: {
-        // Moderate Impact
         casualties: { min: 5, max: 20, avg: 10 },
         damaged: { min: 50, max: 200, avg: 100 },
         cost: { min: 500000, max: 2000000, avg: 1000000 },
@@ -835,47 +806,21 @@ export default function ClusterPage() {
       parseFloat(formData.total_storm_rainfall);
     const pressure = parseFloat(formData.min_pressure);
 
-    // Casualty comparison data
     const casualtyComparisonData = [
       { name: "Your Input", value: casualties, fill: "#8b5cf6" },
-      {
-        name: "Cluster Avg",
-        value: clusterRange.casualties.avg,
-        fill: "#d1d5db",
-      },
+      { name: "Cluster Avg", value: clusterRange.casualties.avg, fill: "#d1d5db" },
     ];
 
-    // Damage comparison data
     const damageComparisonData = [
-      {
-        name: "Your Input",
-        damaged: damaged,
-        cost: Math.round(cost / 1000000),
-      },
-      {
-        name: "Cluster Avg",
-        damaged: clusterRange.damaged.avg,
-        cost: Math.round(clusterRange.cost.avg / 1000000),
-      },
+      { name: "Your Input", damaged: damaged, cost: Math.round(cost / 1000000) },
+      { name: "Cluster Avg", damaged: clusterRange.damaged.avg, cost: Math.round(clusterRange.cost.avg / 1000000) },
     ];
 
-    // Weather comparison data
     const weatherComparisonData = [
-      {
-        name: "Your Input",
-        wind: wind,
-        rainfall: rainfall,
-        pressure: pressure,
-      },
-      {
-        name: "Cluster Avg",
-        wind: clusterRange.wind.avg,
-        rainfall: clusterRange.rainfall.avg,
-        pressure: clusterRange.pressure.avg,
-      },
+      { name: "Your Input", wind: wind, rainfall: rainfall, pressure: pressure },
+      { name: "Cluster Avg", wind: clusterRange.wind.avg, rainfall: clusterRange.rainfall.avg, pressure: clusterRange.pressure.avg },
     ];
 
-    // Range chart data for all three impact levels
     const impactComparisonData = [
       {
         category: "Casualties",
@@ -900,12 +845,7 @@ export default function ClusterPage() {
       },
     ];
 
-    return {
-      casualtyComparisonData,
-      damageComparisonData,
-      weatherComparisonData,
-      impactComparisonData,
-    };
+    return { casualtyComparisonData, damageComparisonData, weatherComparisonData, impactComparisonData };
   };
 
   const clearBulkData = () => {
@@ -948,39 +888,14 @@ export default function ClusterPage() {
     XLSX.writeFile(workbook, `cluster_predictions_${Date.now()}.xlsx`);
   };
 
-  // Calculate statistics for visualizations
   const calculateStats = useCallback(() => {
     if (bulkResults.length === 0) return null;
 
     const clusterCounts = { 0: 0, 1: 0, 2: 0 };
     const clusterData = {
-      0: {
-        casualties: 0,
-        damaged: 0,
-        cost: 0,
-        wind: 0,
-        rainfall: 0,
-        pressure: 0,
-        count: 0,
-      },
-      1: {
-        casualties: 0,
-        damaged: 0,
-        cost: 0,
-        wind: 0,
-        rainfall: 0,
-        pressure: 0,
-        count: 0,
-      },
-      2: {
-        casualties: 0,
-        damaged: 0,
-        cost: 0,
-        wind: 0,
-        rainfall: 0,
-        pressure: 0,
-        count: 0,
-      },
+      0: { casualties: 0, damaged: 0, cost: 0, wind: 0, rainfall: 0, pressure: 0, count: 0 },
+      1: { casualties: 0, damaged: 0, cost: 0, wind: 0, rainfall: 0, pressure: 0, count: 0 },
+      2: { casualties: 0, damaged: 0, cost: 0, wind: 0, rainfall: 0, pressure: 0, count: 0 },
     };
 
     bulkResults.forEach((row) => {
@@ -998,7 +913,6 @@ export default function ClusterPage() {
       }
     });
 
-    // Calculate averages
     Object.keys(clusterData).forEach((key) => {
       const cluster = parseInt(key) as 0 | 1 | 2;
       const data = clusterData[cluster];
@@ -1015,8 +929,7 @@ export default function ClusterPage() {
   const stats = useMemo(() => calculateStats(), [calculateStats]);
 
   const getChartData = () => {
-    if (!stats)
-      return { pieData: [], casualtyData: [], damageData: [], weatherData: [] };
+    if (!stats) return { pieData: [], casualtyData: [], damageData: [], weatherData: [] };
 
     const { clusterCounts, clusterData } = stats;
 
@@ -1027,66 +940,21 @@ export default function ClusterPage() {
     ];
 
     const casualtyData = [
-      {
-        name: "Low Impact",
-        casualties: Math.round(clusterData[0].casualties),
-        color: "#10b981",
-      },
-      {
-        name: "High Impact",
-        casualties: Math.round(clusterData[1].casualties),
-        color: "#ef4444",
-      },
-      {
-        name: "Moderate Impact",
-        casualties: Math.round(clusterData[2].casualties),
-        color: "#f97316",
-      },
+      { name: "Low Impact", casualties: Math.round(clusterData[0].casualties), color: "#10b981" },
+      { name: "High Impact", casualties: Math.round(clusterData[1].casualties), color: "#ef4444" },
+      { name: "Moderate Impact", casualties: Math.round(clusterData[2].casualties), color: "#f97316" },
     ];
 
     const damageData = [
-      {
-        name: "Low Impact",
-        damaged: Math.round(clusterData[0].damaged),
-        cost: Math.round(clusterData[0].cost / 1000000), // Convert to millions
-        color: "#10b981",
-      },
-      {
-        name: "High Impact",
-        damaged: Math.round(clusterData[1].damaged),
-        cost: Math.round(clusterData[1].cost / 1000000),
-        color: "#ef4444",
-      },
-      {
-        name: "Moderate Impact",
-        damaged: Math.round(clusterData[2].damaged),
-        cost: Math.round(clusterData[2].cost / 1000000),
-        color: "#f97316",
-      },
+      { name: "Low Impact", damaged: Math.round(clusterData[0].damaged), cost: Math.round(clusterData[0].cost / 1000000), color: "#10b981" },
+      { name: "High Impact", damaged: Math.round(clusterData[1].damaged), cost: Math.round(clusterData[1].cost / 1000000), color: "#ef4444" },
+      { name: "Moderate Impact", damaged: Math.round(clusterData[2].damaged), cost: Math.round(clusterData[2].cost / 1000000), color: "#f97316" },
     ];
 
     const weatherData = [
-      {
-        name: "Low Impact",
-        wind: Math.round(clusterData[0].wind),
-        rainfall: Math.round(clusterData[0].rainfall),
-        pressure: Math.round(clusterData[0].pressure),
-        color: "#10b981",
-      },
-      {
-        name: "High Impact",
-        wind: Math.round(clusterData[1].wind),
-        rainfall: Math.round(clusterData[1].rainfall),
-        pressure: Math.round(clusterData[1].pressure),
-        color: "#ef4444",
-      },
-      {
-        name: "Moderate Impact",
-        wind: Math.round(clusterData[2].wind),
-        rainfall: Math.round(clusterData[2].rainfall),
-        pressure: Math.round(clusterData[2].pressure),
-        color: "#f97316",
-      },
+      { name: "Low Impact", wind: Math.round(clusterData[0].wind), rainfall: Math.round(clusterData[0].rainfall), pressure: Math.round(clusterData[0].pressure), color: "#10b981" },
+      { name: "High Impact", wind: Math.round(clusterData[1].wind), rainfall: Math.round(clusterData[1].rainfall), pressure: Math.round(clusterData[1].pressure), color: "#ef4444" },
+      { name: "Moderate Impact", wind: Math.round(clusterData[2].wind), rainfall: Math.round(clusterData[2].rainfall), pressure: Math.round(clusterData[2].pressure), color: "#f97316" },
     ];
 
     return { pieData, casualtyData, damageData, weatherData };
@@ -1104,86 +972,33 @@ export default function ClusterPage() {
             impact profile
           </p>
 
-          {/* Data Disclaimer */}
           <div className="mt-6 max-w-5xl mx-auto bg-amber-50 border border-amber-200 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <svg
-                className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
+              <svg className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
               <div className="text-left">
-                <h3 className="text-sm font-semibold text-amber-900 mb-1">
-                  Data Scope & Limitations
-                </h3>
+                <h3 className="text-sm font-semibold text-amber-900 mb-1">Data Scope & Limitations</h3>
                 <p className="text-xs text-amber-800 leading-relaxed">
-                  The system&rsquo;s predictive outputs are{" "}
-                  <strong>
-                    spatially limited to the catchment areas of reporting
-                    meteorological stations
-                  </strong>
-                  , providing only{" "}
-                  <strong>municipality- or zone-level forecasts</strong>. It
-                  assumes <strong>uniform exposure</strong> within each coverage
-                  area and does not account for{" "}
-                  <strong>micro-topographical differences</strong> such as
-                  coastal, mountainous, or low-lying barangays. Since the model
-                  relies on{" "}
-                  <strong>
-                    station-level data without GIS elevation inputs
-                  </strong>
-                  , localized terrain-specific impacts cannot be assessed.
+                  The system&rsquo;s predictive outputs are <strong>spatially limited to the catchment areas of reporting meteorological stations</strong>, providing only <strong>municipality- or zone-level forecasts</strong>. It assumes <strong>uniform exposure</strong> within each coverage area and does not account for <strong>micro-topographical differences</strong> such as coastal, mountainous, or low-lying barangays. Since the model relies on <strong>station-level data without GIS elevation inputs</strong>, localized terrain-specific impacts cannot be assessed.
                 </p>
-
                 <p className="text-xs text-amber-800 leading-relaxed mt-2">
-                  The model is trained on{" "}
-                  <strong>historical data from 2020&ndash;2024</strong> across
-                  selected regions in the Philippines (Regions 2, 3, 5, and 8).
-                  Therefore, predictions may vary depending on{" "}
-                  <strong>
-                    regional geography, vulnerability, infrastructure, and
-                    preparedness
-                  </strong>
-                  . Results should be interpreted within the{" "}
-                  <strong>municipality-level scope and regional context</strong>
-                  .
+                  The model is trained on <strong>historical data from 2020&ndash;2024</strong> across selected regions in the Philippines (Regions 2, 3, 5, and 8). Therefore, predictions may vary depending on <strong>regional geography, vulnerability, infrastructure, and preparedness</strong>. Results should be interpreted within the <strong>municipality-level scope and regional context</strong>.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Mode Toggle */}
           <div className="flex justify-center gap-4 mt-6">
             <button
-              onClick={() => {
-                setBulkMode(false);
-                clearBulkData();
-              }}
-              className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
-                !bulkMode
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
+              onClick={() => { setBulkMode(false); clearBulkData(); }}
+              className={`px-6 py-2 rounded-lg font-semibold transition-colors ${!bulkMode ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
             >
               Instance Prediction
             </button>
             <button
-              onClick={() => {
-                setBulkMode(true);
-                setResult(null);
-                setError("");
-              }}
-              className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
-                bulkMode
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
+              onClick={() => { setBulkMode(true); setResult(null); setError(""); }}
+              className={`px-6 py-2 rounded-lg font-semibold transition-colors ${bulkMode ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
             >
               Batch Prediction
             </button>
@@ -1191,348 +1006,145 @@ export default function ClusterPage() {
         </div>
 
         {!bulkMode ? (
-          // Existing Single Prediction Form
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2">
-              <form
-                onSubmit={handleSubmit}
-                className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8"
-              >
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">
-                  Input Features
-                </h2>
+              <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-6">Input Features</h2>
 
                 <div className="mb-8">
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">
-                    Impact Metrics
-                  </h3>
+                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Impact Metrics</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Number of Families Affected
-                      </label>
-                      <input
-                        type="number"
-                        name="families"
-                        value={formData.families}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                          validationErrors.families
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="0"
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Number of Families Affected</label>
+                      <input type="number" name="families" value={formData.families} onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.families ? "border-red-500" : "border-gray-300"}`}
+                        placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Number of Persons Affected
-                      </label>
-                      <input
-                        type="number"
-                        name="persons"
-                        value={formData.persons}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                          validationErrors.persons
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="0"
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Number of Persons Affected</label>
+                      <input type="number" name="persons" value={formData.persons} onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.persons ? "border-red-500" : "border-gray-300"}`}
+                        placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Number of Barangays Affected
-                      </label>
-                      <input
-                        type="number"
-                        name="barangays"
-                        value={formData.barangays}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                          validationErrors.barangays
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="0"
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Number of Barangays Affected</label>
+                      <input type="number" name="barangays" value={formData.barangays} onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.barangays ? "border-red-500" : "border-gray-300"}`}
+                        placeholder="0" />
                     </div>
                   </div>
                 </div>
 
                 <div className="mb-8">
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">
-                    Casualty Metrics
-                  </h3>
+                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Casualty Metrics</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Number of Fatalities
-                      </label>
-                      <input
-                        type="number"
-                        name="dead"
-                        value={formData.dead}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                          validationErrors.dead
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="0"
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Number of Fatalities</label>
+                      <input type="number" name="dead" value={formData.dead} onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.dead ? "border-red-500" : "border-gray-300"}`}
+                        placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Injured/Ill
-                      </label>
-                      <input
-                        type="number"
-                        name="injured_ill"
-                        value={formData.injured_ill}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                          validationErrors.injured_ill
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="0"
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Injured/Ill</label>
+                      <input type="number" name="injured_ill" value={formData.injured_ill} onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.injured_ill ? "border-red-500" : "border-gray-300"}`}
+                        placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Missing
-                      </label>
-                      <input
-                        type="number"
-                        name="missing"
-                        value={formData.missing}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                          validationErrors.missing
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="0"
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Missing</label>
+                      <input type="number" name="missing" value={formData.missing} onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.missing ? "border-red-500" : "border-gray-300"}`}
+                        placeholder="0" />
                     </div>
                   </div>
                 </div>
 
                 <div className="mb-8">
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">
-                    Damage Metrics
-                  </h3>
+                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Damage Metrics</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Number of Totally Damaged Houses
-                      </label>
-                      <input
-                        type="number"
-                        name="totally_damaged"
-                        value={formData.totally_damaged}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                          validationErrors.totally_damaged
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="0"
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Number of Totally Damaged Houses</label>
+                      <input type="number" name="totally_damaged" value={formData.totally_damaged} onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.totally_damaged ? "border-red-500" : "border-gray-300"}`}
+                        placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Number of Partially Damaged Houses
-                      </label>
-                      <input
-                        type="number"
-                        name="partially_damaged"
-                        value={formData.partially_damaged}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                          validationErrors.partially_damaged
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="0"
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Number of Partially Damaged Houses</label>
+                      <input type="number" name="partially_damaged" value={formData.partially_damaged} onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.partially_damaged ? "border-red-500" : "border-gray-300"}`}
+                        placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Relief Total
-                        <br />
-                        Cost (PHP)
-                      </label>{" "}
-                      <input
-                        type="number"
-                        name="cost"
-                        value={formData.cost}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                          validationErrors.cost
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="0"
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Relief Total<br />Cost (PHP)</label>
+                      <input type="number" name="cost" value={formData.cost} onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.cost ? "border-red-500" : "border-gray-300"}`}
+                        placeholder="0" />
                     </div>
                   </div>
                 </div>
 
                 <div className="mb-8">
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">
-                    Weather Metrics
-                  </h3>
+                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Weather Metrics</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Start Datetime
-                      </label>
-                      <input
-                        type="datetime-local"
-                        name="start_datetime"
-                        value={formData.start_datetime || ""}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 border-gray-300`}
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Start Datetime</label>
+                      <input type="datetime-local" name="start_datetime" value={formData.start_datetime || ""} onChange={handleInputChange}
+                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 border-gray-300" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        End Datetime
-                      </label>
-                      <input
-                        type="datetime-local"
-                        name="end_datetime"
-                        value={formData.end_datetime || ""}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                          validationErrors.end_datetime
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">End Datetime</label>
+                      <input type="datetime-local" name="end_datetime" value={formData.end_datetime || ""} onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.end_datetime ? "border-red-500" : "border-gray-300"}`} />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Duration (hrs)
-                      </label>
-                      <input
-                        type="number"
-                        name="duration_hrs"
-                        value={formData.duration_hrs}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50 ${
-                          validationErrors.duration_hrs
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="0"
-                        readOnly
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Duration (hrs)</label>
+                      <input type="number" name="duration_hrs" value={formData.duration_hrs} onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50 ${validationErrors.duration_hrs ? "border-red-500" : "border-gray-300"}`}
+                        placeholder="0" readOnly />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Max Sustained Wind (kph)
-                      </label>
-                      <input
-                        type="number"
-                        name="max_sustained_wind"
-                        value={formData.max_sustained_wind}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                          validationErrors.max_sustained_wind
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="Enter wind speed"
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Max Sustained Wind (kph)</label>
+                      <input type="number" name="max_sustained_wind" value={formData.max_sustained_wind} onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.max_sustained_wind ? "border-red-500" : "border-gray-300"}`}
+                        placeholder="Enter wind speed" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        TC Classification
-                      </label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">TC Classification</label>
                       <div className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
                         {typhoonClassification.label}
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Max 24hr Rainfall (mm)
-                      </label>
-                      <input
-                        type="number"
-                        name="max_24hr_rainfall"
-                        value={formData.max_24hr_rainfall}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                          validationErrors.max_24hr_rainfall
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="0"
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Max 24hr Rainfall (mm)</label>
+                      <input type="number" name="max_24hr_rainfall" value={formData.max_24hr_rainfall} onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.max_24hr_rainfall ? "border-red-500" : "border-gray-300"}`}
+                        placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Total Storm Rainfall (mm)
-                      </label>
-                      <input
-                        type="number"
-                        name="total_storm_rainfall"
-                        value={formData.total_storm_rainfall}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                          validationErrors.total_storm_rainfall
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="0"
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Total Storm Rainfall (mm)</label>
+                      <input type="number" name="total_storm_rainfall" value={formData.total_storm_rainfall} onChange={handleInputChange}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.total_storm_rainfall ? "border-red-500" : "border-gray-300"}`}
+                        placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Min Pressure (hPa)
-                      </label>
-                      <input
-                        type="number"
-                        name="min_pressure"
-                        value={formData.min_pressure}
-                        onChange={handleInputChange}
-                        min="870"
-                        max="1013"
-                        step="0.1"
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                          validationErrors.min_pressure
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="870-1100"
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Min Pressure (hPa)</label>
+                      <input type="number" name="min_pressure" value={formData.min_pressure} onChange={handleInputChange}
+                        min="870" max="1013" step="0.1"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.min_pressure ? "border-red-500" : "border-gray-300"}`}
+                        placeholder="870-1100" />
                     </div>
                   </div>
                 </div>
 
                 <div className="mb-8">
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">
-                    Location
-                  </h3>
+                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Location</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Region Affected
-                      </label>
-                      <select
-                        name="region"
-                        value={formData.region}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      >
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Region Affected</label>
+                      <select name="region" value={formData.region} onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                         {regions.map((region) => (
-                          <option key={region.value} value={region.value}>
-                            {region.label}
-                          </option>
+                          <option key={region.value} value={region.value}>{region.label}</option>
                         ))}
                       </select>
                     </div>
@@ -1541,9 +1153,7 @@ export default function ClusterPage() {
 
                 {Object.keys(validationErrors).length > 0 && (
                   <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-red-700 text-sm font-semibold">
-                      Please fix errors before submitting:
-                    </p>
+                    <p className="text-red-700 text-sm font-semibold">Please fix errors before submitting:</p>
                     <ul className="list-disc list-inside text-red-600 text-sm mt-2">
                       {Object.values(validationErrors).map((error, idx) => (
                         <li key={idx}>{error}</li>
@@ -1553,30 +1163,17 @@ export default function ClusterPage() {
                 )}
 
                 <div className="flex gap-4">
-                  <button
-                    type="submit"
-                    disabled={
-                      loading || Object.keys(validationErrors).length > 0
-                    }
-                    className={`flex-1 px-6 py-3 font-semibold rounded-lg ${
-                      loading || Object.keys(validationErrors).length > 0
-                        ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                        : "bg-blue-600 text-white hover:bg-blue-700"
-                    }`}
-                  >
+                  <button type="submit" disabled={loading || Object.keys(validationErrors).length > 0}
+                    className={`flex-1 px-6 py-3 font-semibold rounded-lg ${loading || Object.keys(validationErrors).length > 0 ? "bg-gray-400 text-gray-200 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
                     {loading ? "Processing..." : "Show Impact Profile"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleReset}
-                    className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300"
-                  >
+                  <button type="button" onClick={handleReset}
+                    className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300">
                     Reset
                   </button>
                 </div>
               </form>
 
-              {/* Result Display - Moved below form */}
               {error && (
                 <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-red-700 text-sm">{error}</p>
@@ -1585,31 +1182,16 @@ export default function ClusterPage() {
 
               {result && (
                 <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-6">
-                    Impact Profiling Result
-                  </h2>
-                  <p className="text-sm text-gray-600 mb-6">
-                    Municipality Level
-                  </p>
+                  <h2 className="text-xl font-semibold text-gray-900 mb-6">Impact Profiling Result</h2>
+                  <p className="text-sm text-gray-600 mb-6">Municipality Level</p>
                   <div className="space-y-6">
-                    <div
-                      className={`p-6 rounded-xl border-2 ${getClusterBgColor(
-                        result.cluster
-                      )}`}
-                    >
+                    <div className={`p-6 rounded-xl border-2 ${getClusterBgColor(result.cluster)}`}>
                       <div className="text-center">
-                        <div
-                          className={`inline-flex items-center justify-center w-20 h-20 rounded-full ${getClusterColor(
-                            result.cluster
-                          )} text-white text-3xl font-bold mb-4`}
-                        ></div>
-                        <h3 className="text-xl font-bold text-gray-900">
-                          {getClusterLabel(result.cluster)}
-                        </h3>
+                        <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full ${getClusterColor(result.cluster)} text-white text-3xl font-bold mb-4`}></div>
+                        <h3 className="text-xl font-bold text-gray-900">{getClusterLabel(result.cluster)}</h3>
                       </div>
                     </div>
 
-                    {/* Key Input Metrics Summary */}
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                       <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 text-center flex flex-col justify-center">
                         <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Start Date</div>
@@ -1637,24 +1219,14 @@ export default function ClusterPage() {
                       </div>
                     </div>
 
-                    {/* Single Prediction Charts */}
                     {(() => {
                       const chartData = getSinglePredictionChartData();
                       if (!chartData) return null;
-
-                      const {
-                        casualtyComparisonData,
-                        damageComparisonData,
-                        weatherComparisonData,
-                        impactComparisonData,
-                      } = chartData;
-
+                      const { casualtyComparisonData, damageComparisonData, weatherComparisonData, impactComparisonData } = chartData;
                       return (
                         <div className="space-y-8">
                           <div>
-                            <h4 className="text-sm font-medium text-gray-700 mb-4">
-                              Impact Comparison Across All Levels
-                            </h4>
+                            <h4 className="text-sm font-medium text-gray-700 mb-4">Impact Comparison Across All Levels</h4>
                             <ResponsiveContainer width="100%" height={300}>
                               <BarChart data={impactComparisonData}>
                                 <CartesianGrid strokeDasharray="3 3" />
@@ -1668,17 +1240,10 @@ export default function ClusterPage() {
                                 <Bar dataKey="High Impact" fill="#ef4444" />
                               </BarChart>
                             </ResponsiveContainer>
-                            <p className="text-xs text-gray-500 mt-2 text-center">
-                              Your input compared to typical values for each
-                              impact level
-                            </p>
+                            <p className="text-xs text-gray-500 mt-2 text-center">Your input compared to typical values for each impact level</p>
                           </div>
-
                           <div>
-                            <h4 className="text-sm font-medium text-gray-700 mb-4">
-                              Your Input vs. {getClusterLabel(result.cluster)}{" "}
-                              Average - Casualties
-                            </h4>
+                            <h4 className="text-sm font-medium text-gray-700 mb-4">Your Input vs. {getClusterLabel(result.cluster)} Average - Casualties</h4>
                             <ResponsiveContainer width="100%" height={250}>
                               <BarChart data={casualtyComparisonData}>
                                 <CartesianGrid strokeDasharray="3 3" />
@@ -1686,19 +1251,12 @@ export default function ClusterPage() {
                                 <YAxis />
                                 <Tooltip />
                                 <Legend />
-                                <Bar
-                                  dataKey="value"
-                                  name="Total Casualties (Dead + Injured + Missing)"
-                                />
+                                <Bar dataKey="value" name="Total Casualties (Dead + Injured + Missing)" />
                               </BarChart>
                             </ResponsiveContainer>
                           </div>
-
                           <div>
-                            <h4 className="text-sm font-medium text-gray-700 mb-4">
-                              Your Input vs. {getClusterLabel(result.cluster)}{" "}
-                              Average - Property Damage & Cost
-                            </h4>
+                            <h4 className="text-sm font-medium text-gray-700 mb-4">Your Input vs. {getClusterLabel(result.cluster)} Average - Property Damage & Cost</h4>
                             <ResponsiveContainer width="100%" height={250}>
                               <BarChart data={damageComparisonData}>
                                 <CartesianGrid strokeDasharray="3 3" />
@@ -1707,27 +1265,13 @@ export default function ClusterPage() {
                                 <YAxis yAxisId="right" orientation="right" />
                                 <Tooltip />
                                 <Legend />
-                                <Bar
-                                  yAxisId="left"
-                                  dataKey="damaged"
-                                  name="Houses Damaged"
-                                  fill="#3b82f6"
-                                />
-                                <Bar
-                                  yAxisId="right"
-                                  dataKey="cost"
-                                  name="Relief Cost (Million PHP)"
-                                  fill="#f59e0b"
-                                />
+                                <Bar yAxisId="left" dataKey="damaged" name="Houses Damaged" fill="#3b82f6" />
+                                <Bar yAxisId="right" dataKey="cost" name="Relief Cost (Million PHP)" fill="#f59e0b" />
                               </BarChart>
                             </ResponsiveContainer>
                           </div>
-
                           <div>
-                            <h4 className="text-sm font-medium text-gray-700 mb-4">
-                              Your Input vs. {getClusterLabel(result.cluster)}{" "}
-                              Average - Weather Metrics
-                            </h4>
+                            <h4 className="text-sm font-medium text-gray-700 mb-4">Your Input vs. {getClusterLabel(result.cluster)} Average - Weather Metrics</h4>
                             <ResponsiveContainer width="100%" height={250}>
                               <LineChart data={weatherComparisonData}>
                                 <CartesianGrid strokeDasharray="3 3" />
@@ -1736,30 +1280,9 @@ export default function ClusterPage() {
                                 <YAxis yAxisId="right" orientation="right" />
                                 <Tooltip />
                                 <Legend />
-                                <Line
-                                  yAxisId="left"
-                                  type="monotone"
-                                  dataKey="wind"
-                                  stroke="#06b6d4"
-                                  strokeWidth={2}
-                                  name="Wind Speed (kph)"
-                                />
-                                <Line
-                                  yAxisId="left"
-                                  type="monotone"
-                                  dataKey="rainfall"
-                                  stroke="#10b981"
-                                  strokeWidth={2}
-                                  name="Rainfall (mm)"
-                                />
-                                <Line
-                                  yAxisId="right"
-                                  type="monotone"
-                                  dataKey="pressure"
-                                  stroke="#8b5cf6"
-                                  strokeWidth={2}
-                                  name="Pressure (hPa)"
-                                />
+                                <Line yAxisId="left" type="monotone" dataKey="wind" stroke="#06b6d4" strokeWidth={2} name="Wind Speed (kph)" />
+                                <Line yAxisId="left" type="monotone" dataKey="rainfall" stroke="#10b981" strokeWidth={2} name="Rainfall (mm)" />
+                                <Line yAxisId="right" type="monotone" dataKey="pressure" stroke="#8b5cf6" strokeWidth={2} name="Pressure (hPa)" />
                               </LineChart>
                             </ResponsiveContainer>
                           </div>
@@ -1768,27 +1291,13 @@ export default function ClusterPage() {
                     })()}
 
                     <div>
-                      <h4 className="text-sm font-medium text-gray-500 uppercase mb-3">
-                        Description
-                      </h4>
+                      <h4 className="text-sm font-medium text-gray-500 uppercase mb-3">Description</h4>
                       <div className="space-y-4">
                         <ReactMarkdown
                           components={{
-                            h3: ({ children }) => (
-                              <h3 className="text-sm font-bold text-gray-900 mt-4 mb-2 first:mt-0 border-t border-gray-200 pt-3 first:border-t-0 first:pt-0">
-                                {children}
-                              </h3>
-                            ),
-                            p: ({ children }) => (
-                              <p className="text-sm text-gray-700 leading-relaxed">
-                                {children}
-                              </p>
-                            ),
-                            strong: ({ children }) => (
-                              <strong className="font-semibold text-gray-900">
-                                {children}
-                              </strong>
-                            ),
+                            h3: ({ children }) => <h3 className="text-sm font-bold text-gray-900 mt-4 mb-2 first:mt-0 border-t border-gray-200 pt-3 first:border-t-0 first:pt-0">{children}</h3>,
+                            p: ({ children }) => <p className="text-sm text-gray-700 leading-relaxed">{children}</p>,
+                            strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
                           }}
                         >
                           {result.description}
@@ -1803,35 +1312,17 @@ export default function ClusterPage() {
             <div className="lg:col-span-1">
               <div className="lg:sticky lg:top-6 space-y-6">
                 <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100">
-                  <h3 className="font-semibold text-blue-900 mb-3">
-                    Severity Levels
-                  </h3>
-                  <p className="text-blue-800 text-sm mb-4">
-                    Clustering analysis using interpretable patterns:
-                  </p>
+                  <h3 className="font-semibold text-blue-900 mb-3">Severity Levels</h3>
+                  <p className="text-blue-800 text-sm mb-4">Clustering analysis using interpretable patterns:</p>
                   <div className="space-y-2 text-sm">
-                    <div className="flex items-center">
-                      <span className="w-3 h-3 rounded-full bg-red-500 mr-2"></span>
-                      <span>High Impact</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="w-3 h-3 rounded-full bg-orange-500 mr-2"></span>
-                      <span>Moderate Impact</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="w-3 h-3 rounded-full bg-green-500 mr-2"></span>
-                      <span>Low Impact</span>
-                    </div>
+                    <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-red-500 mr-2"></span><span>High Impact</span></div>
+                    <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-orange-500 mr-2"></span><span>Moderate Impact</span></div>
+                    <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-green-500 mr-2"></span><span>Low Impact</span></div>
                   </div>
                 </div>
-
                 <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
-                  <h3 className="font-semibold text-gray-900 mb-3">
-                    (TC) Tropical Cyclone Classification
-                  </h3>
-                  <p className="text-gray-600 text-sm mb-4">
-                    Auto-detected based on max sustained wind:
-                  </p>
+                  <h3 className="font-semibold text-gray-900 mb-3">(TC) Tropical Cyclone Classification</h3>
+                  <p className="text-gray-600 text-sm mb-4">Auto-detected based on max sustained wind:</p>
                   <div className="space-y-2 text-xs text-gray-600">
                     <div>TD - Tropical Depression: ≤61 km/h</div>
                     <div>TS - Tropical Storm: 62-88 km/h</div>
@@ -1844,30 +1335,14 @@ export default function ClusterPage() {
             </div>
           </div>
         ) : (
-          // Bulk Prediction Interface
           <div className="space-y-6">
-            {/* File Upload Section */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  Bulk Prediction
-                </h2>
-                <button
-                  onClick={handleDownloadTemplate}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
+                <h2 className="text-xl font-semibold text-gray-900">Bulk Prediction</h2>
+                <button onClick={handleDownloadTemplate}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   Download Template
                 </button>
@@ -1875,85 +1350,43 @@ export default function ClusterPage() {
 
               <div className="space-y-4">
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="file-upload"
-                  />
-                  <label
-                    htmlFor="file-upload"
-                    className="cursor-pointer inline-flex flex-col items-center"
-                  >
-                    <svg
-                      className="w-12 h-12 text-gray-400 mb-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                      />
+                  <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" id="file-upload" />
+                  <label htmlFor="file-upload" className="cursor-pointer inline-flex flex-col items-center">
+                    <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
-                    <span className="text-sm font-medium text-gray-700">
-                      Click to upload Excel/CSV file
-                    </span>
-                    <span className="text-xs text-gray-500 mt-1">
-                      Supports .xlsx, .xls, .csv
-                    </span>
+                    <span className="text-sm font-medium text-gray-700">Click to upload Excel/CSV file</span>
+                    <span className="text-xs text-gray-500 mt-1">Supports .xlsx, .xls, .csv</span>
                   </label>
                 </div>
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-blue-900 mb-2">
-                    Required Columns:
-                  </h4>
+                  <h4 className="text-sm font-semibold text-blue-900 mb-2">Required Columns:</h4>
                   <p className="text-xs text-blue-800">
-                    families, persons, barangays, dead, injured_ill, missing,
-                    totally_damaged, partially_damaged, cost, duration_hrs,
-                    max_sustained_wind, max_24hr_rainfall, total_storm_rainfall,
-                    min_pressure, region
+                    families, persons, barangays, dead, injured_ill, missing, totally_damaged, partially_damaged, cost, duration_hrs, max_sustained_wind, max_24hr_rainfall, total_storm_rainfall, min_pressure, region
                   </p>
                 </div>
 
-                {/* Missing Columns Error */}
                 {missingColumns.length > 0 && (
                   <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <h4 className="text-sm font-semibold text-red-900 mb-2">
-                      ❌ Missing Required Columns:
-                    </h4>
+                    <h4 className="text-sm font-semibold text-red-900 mb-2">❌ Missing Required Columns:</h4>
                     <ul className="list-disc list-inside text-xs text-red-800">
-                      {missingColumns.map((col) => (
-                        <li key={col}>{col}</li>
-                      ))}
+                      {missingColumns.map((col) => <li key={col}>{col}</li>)}
                     </ul>
                   </div>
                 )}
 
-                {/* Validation Errors */}
                 {bulkValidationErrors.length > 0 && (
                   <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg max-h-96 overflow-y-auto">
                     <h4 className="text-sm font-semibold text-yellow-900 mb-3 sticky top-0 bg-yellow-50 pb-2">
-                      ⚠️ Validation Errors ({bulkValidationErrors.length} row
-                      {bulkValidationErrors.length > 1 ? "s" : ""})
+                      ⚠️ Validation Errors ({bulkValidationErrors.length} row{bulkValidationErrors.length > 1 ? "s" : ""})
                     </h4>
                     <div className="space-y-3">
                       {bulkValidationErrors.map((error) => (
-                        <div
-                          key={error.rowNumber}
-                          className="border-l-4 border-yellow-400 pl-3"
-                        >
-                          <p className="text-xs font-semibold text-yellow-900 mb-1">
-                            Row {error.rowNumber}:
-                          </p>
+                        <div key={error.rowNumber} className="border-l-4 border-yellow-400 pl-3">
+                          <p className="text-xs font-semibold text-yellow-900 mb-1">Row {error.rowNumber}:</p>
                           <ul className="list-disc list-inside text-xs text-yellow-800 space-y-1">
-                            {error.errors.map((err, idx) => (
-                              <li key={idx}>{err}</li>
-                            ))}
+                            {error.errors.map((err, idx) => <li key={idx}>{err}</li>)}
                           </ul>
                         </div>
                       ))}
@@ -1963,31 +1396,16 @@ export default function ClusterPage() {
 
                 {bulkData.length > 0 && (
                   <div className="flex gap-4">
-                    <button
-                      onClick={handleBulkPredict}
-                      disabled={bulkLoading || bulkValidationErrors.length > 0}
-                      className={`flex-1 px-6 py-3 font-semibold rounded-lg ${
-                        bulkLoading || bulkValidationErrors.length > 0
-                          ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                          : "bg-blue-600 text-white hover:bg-blue-700"
-                      }`}
-                    >
-                      {bulkLoading
-                        ? "Processing..."
-                        : `Predict ${bulkData.length} Rows`}
+                    <button onClick={handleBulkPredict} disabled={bulkLoading || bulkValidationErrors.length > 0}
+                      className={`flex-1 px-6 py-3 font-semibold rounded-lg ${bulkLoading || bulkValidationErrors.length > 0 ? "bg-gray-400 text-gray-200 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
+                      {bulkLoading ? "Processing..." : `Predict ${bulkData.length} Rows`}
                     </button>
                     {bulkResults.length > 0 && (
-                      <button
-                        onClick={handleExportResults}
-                        className="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700"
-                      >
+                      <button onClick={handleExportResults} className="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700">
                         Export Results
                       </button>
                     )}
-                    <button
-                      onClick={clearBulkData}
-                      className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300"
-                    >
+                    <button onClick={clearBulkData} className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300">
                       Clear
                     </button>
                   </div>
@@ -2001,250 +1419,111 @@ export default function ClusterPage() {
               </div>
             </div>
 
-            {/* Charts Section - NEW */}
-            {bulkResults.length > 0 &&
-              (() => {
-                const { pieData, casualtyData, damageData, weatherData } =
-                  getChartData();
-                return (
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-6">
-                      Impact Profile Visualization
-                    </h3>
-
-                    {/* Distribution Pie Chart */}
-                    <div className="mb-8">
-                      <h4 className="text-sm font-medium text-gray-700 mb-4">
-                        Impact Level Distribution
-                      </h4>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                          <Pie
-                            data={pieData}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            label={(entry: any) =>
-                              `${entry.name}: ${(
-                                (entry.percent || 0) * 100
-                              ).toFixed(0)}%`
-                            }
-                            outerRadius={100}
-                            fill="#8884d8"
-                            dataKey="value"
-                          >
-                            {pieData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-
-                    {/* Casualties Bar Chart */}
-                    <div className="mb-8">
-                      <h4 className="text-sm font-medium text-gray-700 mb-4">
-                        Total Casualties by Impact Level
-                      </h4>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={casualtyData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Bar
-                            dataKey="casualties"
-                            name="Total Casualties"
-                            fill="#8b5cf6"
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-
-                    {/* Property Damage Bar Chart */}
-                    <div className="mb-8">
-                      <h4 className="text-sm font-medium text-gray-700 mb-4">
-                        Property Damage & Relief Cost by Impact Level
-                      </h4>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={damageData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis yAxisId="left" orientation="left" />
-                          <YAxis yAxisId="right" orientation="right" />
-                          <Tooltip />
-                          <Legend />
-                          <Bar
-                            yAxisId="left"
-                            dataKey="damaged"
-                            name="Houses Damaged"
-                            fill="#3b82f6"
-                          />
-                          <Bar
-                            yAxisId="right"
-                            dataKey="cost"
-                            name="Relief Cost (Million PHP)"
-                            fill="#f59e0b"
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-
-                    {/* Weather Data Line Chart */}
-                    <div className="mb-8">
-                      <h4 className="text-sm font-medium text-gray-700 mb-4">
-                        Average Weather Metrics by Impact Level
-                      </h4>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={weatherData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis yAxisId="left" />
-                          <YAxis yAxisId="right" orientation="right" />
-                          <Tooltip />
-                          <Legend />
-                          <Line
-                            yAxisId="left"
-                            type="monotone"
-                            dataKey="wind"
-                            stroke="#06b6d4"
-                            strokeWidth={2}
-                            name="Wind Speed (kph)"
-                          />
-                          <Line
-                            yAxisId="left"
-                            type="monotone"
-                            dataKey="rainfall"
-                            stroke="#10b981"
-                            strokeWidth={2}
-                            name="Rainfall (mm)"
-                          />
-                          <Line
-                            yAxisId="right"
-                            type="monotone"
-                            dataKey="pressure"
-                            stroke="#8b5cf6"
-                            strokeWidth={2}
-                            name="Pressure (hPa)"
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
+            {bulkResults.length > 0 && (() => {
+              const { pieData, casualtyData, damageData, weatherData } = getChartData();
+              return (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-6">Impact Profile Visualization</h3>
+                  <div className="mb-8">
+                    <h4 className="text-sm font-medium text-gray-700 mb-4">Impact Level Distribution</h4>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie data={pieData} cx="50%" cy="50%" labelLine={false}
+                          label={(entry: any) => `${entry.name}: ${((entry.percent || 0) * 100).toFixed(0)}%`}
+                          outerRadius={100} fill="#8884d8" dataKey="value">
+                          {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
-                );
-              })()}
+                  <div className="mb-8">
+                    <h4 className="text-sm font-medium text-gray-700 mb-4">Total Casualties by Impact Level</h4>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={casualtyData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" /><YAxis /><Tooltip /><Legend />
+                        <Bar dataKey="casualties" name="Total Casualties" fill="#8b5cf6" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mb-8">
+                    <h4 className="text-sm font-medium text-gray-700 mb-4">Property Damage & Relief Cost by Impact Level</h4>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={damageData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis yAxisId="left" orientation="left" />
+                        <YAxis yAxisId="right" orientation="right" />
+                        <Tooltip /><Legend />
+                        <Bar yAxisId="left" dataKey="damaged" name="Houses Damaged" fill="#3b82f6" />
+                        <Bar yAxisId="right" dataKey="cost" name="Relief Cost (Million PHP)" fill="#f59e0b" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mb-8">
+                    <h4 className="text-sm font-medium text-gray-700 mb-4">Average Weather Metrics by Impact Level</h4>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={weatherData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis yAxisId="left" />
+                        <YAxis yAxisId="right" orientation="right" />
+                        <Tooltip /><Legend />
+                        <Line yAxisId="left" type="monotone" dataKey="wind" stroke="#06b6d4" strokeWidth={2} name="Wind Speed (kph)" />
+                        <Line yAxisId="left" type="monotone" dataKey="rainfall" stroke="#10b981" strokeWidth={2} name="Rainfall (mm)" />
+                        <Line yAxisId="right" type="monotone" dataKey="pressure" stroke="#8b5cf6" strokeWidth={2} name="Pressure (hPa)" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              );
+            })()}
 
-            {/* Data Preview */}
             {bulkData.length > 0 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
                   Data Preview ({bulkData.length} rows)
                   {bulkValidationErrors.length > 0 && (
-                    <span className="ml-2 text-sm font-normal text-yellow-600">
-                      • {bulkValidationErrors.length} row(s) with errors
-                    </span>
+                    <span className="ml-2 text-sm font-normal text-yellow-600">• {bulkValidationErrors.length} row(s) with errors</span>
                   )}
                 </h3>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                          Row
-                        </th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                          Families
-                        </th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                          Persons
-                        </th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                          Barangays
-                        </th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                          Dead
-                        </th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                          Wind (kph)
-                        </th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                          Region
-                        </th>
-                        {bulkResults.length > 0 && (
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                            Impact Level
-                          </th>
-                        )}
+                        {["Row","Families","Persons","Barangays","Dead","Wind (kph)","Region"].map(h => (
+                          <th key={h} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
+                        ))}
+                        {bulkResults.length > 0 && <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Impact Level</th>}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {(bulkResults.length > 0 ? bulkResults : bulkData)
-                        .slice(0, 10)
-                        .map((row, idx) => {
-                          const hasError = bulkValidationErrors.some(
-                            (e) => e.rowNumber === row.rowNumber
-                          );
-                          return (
-                            <tr
-                              key={idx}
-                              className={`${
-                                hasError ? "bg-yellow-50" : "hover:bg-gray-50"
-                              }`}
-                            >
-                              <td className="px-3 py-2 text-sm text-gray-900">
-                                {row.rowNumber}
-                                {hasError && (
-                                  <span className="ml-1 text-yellow-600">
-                                    ⚠️
-                                  </span>
-                                )}
+                      {(bulkResults.length > 0 ? bulkResults : bulkData).slice(0, 10).map((row, idx) => {
+                        const hasError = bulkValidationErrors.some((e) => e.rowNumber === row.rowNumber);
+                        return (
+                          <tr key={idx} className={hasError ? "bg-yellow-50" : "hover:bg-gray-50"}>
+                            <td className="px-3 py-2 text-sm text-gray-900">{row.rowNumber}{hasError && <span className="ml-1 text-yellow-600">⚠️</span>}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900">{row.families}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900">{row.persons}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900">{row.barangays}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900">{row.dead}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900">{row.max_sustained_wind}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900">{row.region}</td>
+                            {bulkResults.length > 0 && (
+                              <td className="px-3 py-2 text-sm">
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${row.cluster === 0 ? "bg-green-100 text-green-800" : row.cluster === 1 ? "bg-red-100 text-red-800" : row.cluster === 2 ? "bg-orange-100 text-orange-800" : "bg-gray-100 text-gray-800"}`}>
+                                  {row.impact_level}
+                                </span>
                               </td>
-                              <td className="px-3 py-2 text-sm text-gray-900">
-                                {row.families}
-                              </td>
-                              <td className="px-3 py-2 text-sm text-gray-900">
-                                {row.persons}
-                              </td>
-                              <td className="px-3 py-2 text-sm text-gray-900">
-                                {row.barangays}
-                              </td>
-                              <td className="px-3 py-2 text-sm text-gray-900">
-                                {row.dead}
-                              </td>
-                              <td className="px-3 py-2 text-sm text-gray-900">
-                                {row.max_sustained_wind}
-                              </td>
-                              <td className="px-3 py-2 text-sm text-gray-900">
-                                {row.region}
-                              </td>
-                              {bulkResults.length > 0 && (
-                                <td className="px-3 py-2 text-sm">
-                                  <span
-                                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                      row.cluster === 0
-                                        ? "bg-green-100 text-green-800"
-                                        : row.cluster === 1
-                                        ? "bg-red-100 text-red-800"
-                                        : row.cluster === 2
-                                        ? "bg-orange-100 text-orange-800"
-                                        : "bg-gray-100 text-gray-800"
-                                    }`}
-                                  >
-                                    {row.impact_level}
-                                  </span>
-                                </td>
-                              )}
-                            </tr>
-                          );
-                        })}
+                            )}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                   {bulkData.length > 10 && (
-                    <p className="text-xs text-gray-500 mt-2 text-center">
-                      Showing 10 of {bulkData.length} rows
-                    </p>
+                    <p className="text-xs text-gray-500 mt-2 text-center">Showing 10 of {bulkData.length} rows</p>
                   )}
                 </div>
               </div>
