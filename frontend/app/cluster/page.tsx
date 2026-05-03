@@ -82,7 +82,12 @@ interface ImpactProfileSnapshot {
   missing: number;
   totally_damaged: number;
   partially_damaged: number;
-  // batch: array of per-row snapshots (used to override batch prediction)
+  region: number;
+  max_sustained_wind: number;
+  max_24hr_rainfall: number;
+  total_storm_rainfall: number;
+  min_pressure: number;
+  duration_hrs: number;
   batchSnapshots?: {
     severity_cluster: number;
     severity_label: string;
@@ -94,6 +99,12 @@ interface ImpactProfileSnapshot {
     missing: number;
     totally_damaged: number;
     partially_damaged: number;
+    region: number;
+    max_sustained_wind: number;
+    max_24hr_rainfall: number;
+    total_storm_rainfall: number;
+    min_pressure: number;
+    duration_hrs: number;
   }[];
 }
 
@@ -605,6 +616,12 @@ export default function ClusterPage() {
           missing: first.missing,
           totally_damaged: first.totally_damaged,
           partially_damaged: first.partially_damaged,
+          region: first.region,
+          max_sustained_wind: first.max_sustained_wind,
+          max_24hr_rainfall: first.max_24hr_rainfall,
+          total_storm_rainfall: first.total_storm_rainfall,
+          min_pressure: first.min_pressure,
+          duration_hrs: first.duration_hrs,
           batchSnapshots: validResults.map((r) => ({
             severity_cluster: r.cluster!,
             severity_label: getClusterLabel(r.cluster!),
@@ -616,6 +633,12 @@ export default function ClusterPage() {
             missing: r.missing,
             totally_damaged: r.totally_damaged,
             partially_damaged: r.partially_damaged,
+            region: r.region,
+            max_sustained_wind: r.max_sustained_wind,
+            max_24hr_rainfall: r.max_24hr_rainfall,
+            total_storm_rainfall: r.total_storm_rainfall,
+            min_pressure: r.min_pressure,
+            duration_hrs: r.duration_hrs,
           })),
         };
         saveImpactSnapshot(snapshot);
@@ -713,6 +736,12 @@ export default function ClusterPage() {
         missing: parseFloat(formData.missing) || 0,
         totally_damaged: parseFloat(formData.totally_damaged) || 0,
         partially_damaged: parseFloat(formData.partially_damaged) || 0,
+        region: parseInt(formData.region),
+        max_sustained_wind: parseFloat(formData.max_sustained_wind) || 0,
+        max_24hr_rainfall: parseFloat(formData.max_24hr_rainfall) || 0,
+        total_storm_rainfall: parseFloat(formData.total_storm_rainfall) || 0,
+        min_pressure: parseFloat(formData.min_pressure) || 0,
+        duration_hrs: parseFloat(formData.duration_hrs) || 0,
       };
       saveImpactSnapshot(snapshot);
       // ─────────────────────────────────────────────────────────────────
