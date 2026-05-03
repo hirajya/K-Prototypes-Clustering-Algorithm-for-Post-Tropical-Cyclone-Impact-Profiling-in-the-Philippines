@@ -100,6 +100,8 @@ interface ImpactProfileSnapshot {
 const IMPACT_PROFILE_KEY = "impactProfileSnapshot";
 
 const saveImpactSnapshot = (snapshot: ImpactProfileSnapshot) => {
+  // Guard against SSR (Vercel/Next.js runs server-side where localStorage is unavailable)
+  if (typeof window === 'undefined') return
   try {
     localStorage.setItem(IMPACT_PROFILE_KEY, JSON.stringify(snapshot));
   } catch {

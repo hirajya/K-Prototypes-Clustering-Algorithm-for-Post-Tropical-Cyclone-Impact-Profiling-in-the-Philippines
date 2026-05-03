@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts'
 
 interface ForecastResult {
@@ -64,6 +64,8 @@ interface ImpactProfileSnapshot {
 const IMPACT_PROFILE_KEY = 'impactProfileSnapshot'
 
 const loadImpactSnapshot = (): ImpactProfileSnapshot | null => {
+  // Guard against SSR (Vercel/Next.js runs server-side where localStorage is unavailable)
+  if (typeof window === 'undefined') return null
   try {
     const raw = localStorage.getItem(IMPACT_PROFILE_KEY)
     return raw ? (JSON.parse(raw) as ImpactProfileSnapshot) : null
@@ -253,9 +255,9 @@ const applyImpactOverride = (
   rainfallTotal: number,
   pressure: number,
   duration: number,
+  snapshot: ImpactProfileSnapshot | null,
 ): ForecastResult => {
-  // Priority 1 – localStorage snapshot from Impact Profiling
-  const snapshot = loadImpactSnapshot()
+  // Priority 1 – localStorage snapshot from Impact Profiling (passed in from handler)
   if (snapshot) {
     return buildOverrideResult(apiResult, snapshot)
   }
@@ -358,6 +360,13 @@ export default function PredictionPage() {
   const [bulkError, setBulkError] = useState('')
   const [bulkProgress, setBulkProgress] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Cache the Impact Profiling snapshot in a ref so it is always read
+  // client-side (avoids Vercel SSR / Next.js hydration issues with localStorage)
+  const impactSnapshotRef = useRef<ImpactProfileSnapshot | null>(null)
+  useEffect(() => {
+    impactSnapshotRef.current = loadImpactSnapshot()
+  }, [])
 
   const typhoonClassification = useMemo(() => {
     const wind = parseFloat(formData.max_sustained_wind) || 0
@@ -470,6 +479,9 @@ export default function PredictionPage() {
       let data: ForecastResult = await response.json()
 
       // Apply override: Impact Profiling snapshot first, then test case fallback
+      // Refresh ref at submit time to catch snapshots saved after mount (Vercel safe)
+      impactSnapshotRef.current = loadImpactSnapshot()
+      const impactSnapshot = impactSnapshotRef.current
       data = applyImpactOverride(
         data,
         formData.region ? parseInt(formData.region) : 0,
@@ -478,6 +490,7 @@ export default function PredictionPage() {
         parseFloat(formData.total_storm_rainfall) || 0,
         parseFloat(formData.min_pressure) || 0,
         computedDuration,
+        impactSnapshot,
       )
 
       setResult(data)
@@ -537,6 +550,10 @@ export default function PredictionPage() {
     setBulkLoading(true)
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clustering-for-post-tropical-cyclone.onrender.com'
 
+    // Refresh ref at submit time to catch snapshots saved after mount (Vercel safe)
+    impactSnapshotRef.current = loadImpactSnapshot()
+    const batchSnapshot = impactSnapshotRef.current
+
     const results: BulkRow[] = []
 
     for (let i = 0; i < rows.length; i++) {
@@ -572,7 +589,7 @@ export default function PredictionPage() {
           let data: ForecastResult = await response.json()
 
           // Apply override: snapshot first, then per-row test case fallback
-          data = applyImpactOverride(data, regionVal, wind, rainfall24, rainfallTotal, pressure, duration)
+          data = applyImpactOverride(data, regionVal, wind, rainfall24, rainfallTotal, pressure, duration, batchSnapshot)
 
           results.push({ input: row, result: data })
         }
