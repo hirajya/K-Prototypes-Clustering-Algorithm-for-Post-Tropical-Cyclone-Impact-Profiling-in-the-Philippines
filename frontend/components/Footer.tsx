@@ -16,7 +16,7 @@ const Footer = () => {
       github: "https://github.com/hirajya"
     },
     {
-      name: "Racho, Charles",
+      name: "Racho, Charles Angelo",
       linkedin: "https://www.linkedin.com/in/rachocr/",
       github: "https://github.com/rachocr"
     },
