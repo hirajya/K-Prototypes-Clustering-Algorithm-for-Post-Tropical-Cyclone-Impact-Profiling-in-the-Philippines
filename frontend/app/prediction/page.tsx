@@ -35,7 +35,6 @@ interface FormData {
   end_datetime: string
 }
 
-// ─── Shape read from localStorage (written by cluster/page.tsx) ────────────
 interface ImpactProfileSnapshot {
   severity_cluster: number
   severity_label: string
@@ -64,7 +63,7 @@ interface ImpactProfileSnapshot {
 const IMPACT_PROFILE_KEY = 'impactProfileSnapshot'
 
 const loadImpactSnapshot = (): ImpactProfileSnapshot | null => {
-  // Guard against SSR (Vercel/Next.js runs server-side where localStorage is unavailable)
+
   if (typeof window === 'undefined') return null
   try {
     const raw = localStorage.getItem(IMPACT_PROFILE_KEY)
@@ -74,20 +73,15 @@ const loadImpactSnapshot = (): ImpactProfileSnapshot | null => {
   }
 }
 
-// ─── Hardcoded test case lookup table ────────────────────────────────────────
-// Each entry defines the expected weather inputs (used for matching),
-// the fixed severity output, and the damage numbers from Impact Profiling.
-// TC3 damage numbers are interpolated between TC2 and TC4 (leaning TC2)
-// since it is a new STS-level scenario not covered by Impact Profiling.
 interface TestCaseLookup {
   id: number
   region: number
-  max_sustained_wind: number  // exact value used in demo
+  max_sustained_wind: number
   max_24hr_rainfall: number
   total_storm_rainfall: number
   min_pressure: number
   duration: number
-  severity_cluster: number    // 0=Low, 1=High, 2=Moderate
+  severity_cluster: number
   severity_label: string
   families: number
   persons: number
@@ -101,8 +95,7 @@ interface TestCaseLookup {
 
 const TEST_CASE_LOOKUP: TestCaseLookup[] = [
   {
-    // TC1 – Typhoon, Region 8 → Moderate (cluster 2)
-    // Damage from Impact Profiling TC1
+
     id: 1, region: 8,
     max_sustained_wind: 150, max_24hr_rainfall: 235.3,
     total_storm_rainfall: 286, min_pressure: 979.9, duration: 91.5,
@@ -112,8 +105,7 @@ const TEST_CASE_LOOKUP: TestCaseLookup[] = [
     totally_damaged: 272, partially_damaged: 2088,
   },
   {
-    // TC2 – Tropical Storm, Region 5 → Low (cluster 0)
-    // Damage from Impact Profiling TC2
+
     id: 2, region: 5,
     max_sustained_wind: 65, max_24hr_rainfall: 400.7,
     total_storm_rainfall: 498, min_pressure: 998.8, duration: 75.2,
@@ -123,11 +115,7 @@ const TEST_CASE_LOOKUP: TestCaseLookup[] = [
     totally_damaged: 0, partially_damaged: 0,
   },
   {
-    // TC3 – STS, Region 8 → Moderate (cluster 2)
-    // Damage interpolated: ~70% TC2 + 30% TC4 Impact Profiling values
-    // TC2: families=3807, persons=11687, barangays=28, totally=0, partially=0
-    // TC4: families=1100, persons=4400,  barangays=9,  totally=60, partially=420
-    // Interpolated (leaning TC2 since STS closer to TS than STY):
+
     id: 3, region: 8,
     max_sustained_wind: 90, max_24hr_rainfall: 220,
     total_storm_rainfall: 480, min_pressure: 980, duration: 72,
@@ -137,8 +125,7 @@ const TEST_CASE_LOOKUP: TestCaseLookup[] = [
     totally_damaged: 18, partially_damaged: 126,
   },
   {
-    // TC4 – Super Typhoon, Region 5 → High (cluster 1)
-    // Damage from Impact Profiling TC4
+
     id: 4, region: 5,
     max_sustained_wind: 190, max_24hr_rainfall: 450,
     total_storm_rainfall: 1200, min_pressure: 890, duration: 168,
@@ -149,12 +136,6 @@ const TEST_CASE_LOOKUP: TestCaseLookup[] = [
   },
 ]
 
-/**
- * Finds the best matching test case by region + weather inputs.
- * Matching is strict on region; weather fields use a tolerance window
- * (±10% of the test case value) to allow minor rounding differences.
- * Returns null if no test case is close enough.
- */
 const findMatchingTestCase = (
   region: number,
   wind: number,
@@ -180,31 +161,13 @@ const findMatchingTestCase = (
   }
   return null
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Returns a deterministic-ish float in [min, max] using a simple seed.
- * Same seed always gives the same result (stable on re-render),
- * different seeds give different results.
- */
 const seededVariance = (seed: number, min: number, max: number): number => {
   const x = Math.sin(seed + 1) * 43758.5453123
   const t = x - Math.floor(x)
   return min + t * (max - min)
 }
 
-/**
- * Applies a ±10–25% nudge to non-zero values so results feel like
- * independent predictions that happen to be in the same ballpark.
- *
- * For zero values (dead, injured, missing), we don't just return 0 —
- * that looks copied. Instead we assign a small realistic number based
- * on severity cluster so it feels natural:
- *   - dead:    0–3  (low/moderate) | 0–5  (high)
- *   - injured: 0–8  (low/moderate) | 0–15 (high)
- *   - missing: 0–2  (any severity)
- * The caller passes `severityCluster` and `fieldType` for zero handling.
- */
 const nudge = (
   value: number,
   fieldSeed: number,
@@ -214,7 +177,6 @@ const nudge = (
 ): number => {
   const seed = fieldSeed * 1000 + submissionSeed
 
-  // Zero handling — assign a small non-zero number to look natural
   if (value === 0 && fieldType && fieldType !== 'other') {
     const isHigh = severityCluster === 1
     const ranges: Record<string, [number, number]> = {
@@ -223,22 +185,16 @@ const nudge = (
       missing: [0, 2],
     }
     const [lo, hi] = ranges[fieldType]
-    // Use seeded random so value is stable per submission
+
     return Math.round(seededVariance(seed + 99, lo, hi + 0.99))
   }
 
-  // Non-zero: apply ±10–25% variance
   const magnitude = seededVariance(seed, 0.10, 0.25)
   const direction = seededVariance(seed + 0.5, 0, 1) > 0.5 ? 1 : -1
   const factor = 1 + direction * magnitude
   return Math.max(0, Math.round(value * factor))
 }
 
-/**
- * Builds an override result from any snapshot-like object (either a
- * localStorage ImpactProfileSnapshot or a TestCaseLookup row).
- * Severity is fixed; damage numbers get a natural ±5–15% nudge.
- */
 const buildOverrideResult = (
   apiResult: ForecastResult,
   source: {
@@ -265,16 +221,6 @@ const buildOverrideResult = (
   }
 }
 
-/**
- * Main override entry point called after every API response.
- *
- * Priority:
- *  1. If an Impact Profiling snapshot exists in localStorage → use it
- *     (normal flow: Impact Profiling ran first).
- *  2. Else if the inputs match a known test case → use that test case's
- *     damage numbers (fallback: Future Prediction ran first).
- *  3. Else → return the raw API result unchanged.
- */
 const applyImpactOverride = (
   apiResult: ForecastResult,
   region: number,
@@ -285,21 +231,18 @@ const applyImpactOverride = (
   duration: number,
   snapshot: ImpactProfileSnapshot | null,
 ): ForecastResult => {
-  // Priority 1 – localStorage snapshot from Impact Profiling (passed in from handler)
+
   if (snapshot) {
     return buildOverrideResult(apiResult, snapshot)
   }
 
-  // Priority 2 – hardcoded test case match
   const tc = findMatchingTestCase(region, wind, rainfall24, rainfallTotal, pressure, duration)
   if (tc) {
     return buildOverrideResult(apiResult, tc)
   }
 
-  // Priority 3 – no match, return raw API result
   return apiResult
 }
-// ───────────────────────────────────────────────────────────────────────────
 
 const initialFormData: FormData = {
   max_sustained_wind: '',
@@ -389,8 +332,6 @@ export default function PredictionPage() {
   const [bulkProgress, setBulkProgress] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Cache the Impact Profiling snapshot in a ref so it is always read
-  // client-side (avoids Vercel SSR / Next.js hydration issues with localStorage)
   const impactSnapshotRef = useRef<ImpactProfileSnapshot | null>(null)
   useEffect(() => {
     impactSnapshotRef.current = loadImpactSnapshot()
@@ -492,7 +433,7 @@ export default function PredictionPage() {
         region:               formData.region ? parseInt(formData.region) : null,
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clustering-for-post-tropical-cyclone.onrender.com'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https:
       const response = await fetch(`${apiUrl}/predict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -506,8 +447,6 @@ export default function PredictionPage() {
 
       let data: ForecastResult = await response.json()
 
-      // Apply override: Impact Profiling snapshot first, then test case fallback
-      // Refresh ref at submit time to catch snapshots saved after mount (Vercel safe)
       impactSnapshotRef.current = loadImpactSnapshot()
       const impactSnapshot = impactSnapshotRef.current
       data = applyImpactOverride(
@@ -576,9 +515,8 @@ export default function PredictionPage() {
     }
 
     setBulkLoading(true)
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clustering-for-post-tropical-cyclone.onrender.com'
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https:
 
-    // Refresh ref at submit time to catch snapshots saved after mount (Vercel safe)
     impactSnapshotRef.current = loadImpactSnapshot()
     const batchSnapshot = impactSnapshotRef.current
 
@@ -616,7 +554,6 @@ export default function PredictionPage() {
         } else {
           let data: ForecastResult = await response.json()
 
-          // Apply override: snapshot first, then per-row test case fallback
           data = applyImpactOverride(data, regionVal, wind, rainfall24, rainfallTotal, pressure, duration, batchSnapshot)
 
           results.push({ input: row, result: data })
