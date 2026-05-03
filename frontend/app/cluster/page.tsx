@@ -1,5 +1,7 @@
 "use client";
 
+declare const process: { env: { [key: string]: string | undefined } };
+
 import { useState, useMemo, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import * as XLSX from "xlsx";
@@ -398,7 +400,7 @@ export default function ClusterPage() {
       errors.push("Damaged houses seem disproportionate to families affected");
     }
 
-    if (!row.region || ![2, 3, 5, 8].includes(row.region)) {
+    if (!row.region || (row.region !== 2 && row.region !== 3 && row.region !== 5 && row.region !== 8)) {
       errors.push("Region must be 2, 3, 5, or 8");
     }
 
@@ -1186,7 +1188,7 @@ export default function ClusterPage() {
                   <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
                     <p className="text-red-700 text-sm font-semibold">Please fix errors before submitting:</p>
                     <ul className="list-disc list-inside text-red-600 text-sm mt-2">
-                      {Object.values(validationErrors).map((error, idx) => (
+                      {(Object.values(validationErrors) as string[]).map((error: string, idx: number) => (
                         <li key={idx}>{error}</li>
                       ))}
                     </ul>

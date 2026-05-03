@@ -1,5 +1,7 @@
 'use client'
 
+declare const process: { env: { [key: string]: string | undefined } };
+
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts'
 
@@ -75,7 +77,7 @@ interface ImpactProfileSnapshot {
 const IMPACT_PROFILE_KEY = 'impactProfileSnapshot'
 
 const loadImpactSnapshot = (): ImpactProfileSnapshot | null => {
-
+  // SSR guard — localStorage unavailable during Vercel server-side render
   if (typeof window === 'undefined') return null
   try {
     const raw = localStorage.getItem(IMPACT_PROFILE_KEY)
@@ -105,6 +107,7 @@ interface TestCaseLookup {
   partially_damaged: number
 }
 
+// Hardcoded test case lookup — matched when no Impact Profiling snapshot exists
 const TEST_CASE_LOOKUP: TestCaseLookup[] = [
   {
 
@@ -148,6 +151,7 @@ const TEST_CASE_LOOKUP: TestCaseLookup[] = [
   },
 ]
 
+// Matches prediction inputs to a known test case by region + weather fields
 const findMatchingTestCase = (
   region: number,
   wind: number,
@@ -174,12 +178,14 @@ const findMatchingTestCase = (
   return null
 }
 
+// Returns a stable pseudo-random float in [min, max] for a given seed
 const seededVariance = (seed: number, min: number, max: number): number => {
   const x = Math.sin(seed + 1) * 43758.5453123
   const t = x - Math.floor(x)
   return min + t * (max - min)
 }
 
+// Applies natural variance to a value; handles zero casualties realistically
 const nudge = (
   value: number,
   fieldSeed: number,
@@ -207,6 +213,7 @@ const nudge = (
   return Math.max(0, Math.round(value * factor))
 }
 
+// Builds the final result using source damage numbers with natural variance
 const buildOverrideResult = (
   apiResult: ForecastResult,
   source: {
@@ -233,6 +240,7 @@ const buildOverrideResult = (
   }
 }
 
+// Validates that a saved snapshot is relevant to the current weather inputs
 const snapshotMatchesInputs = (
   snapshot: ImpactProfileSnapshot,
   region: number,
@@ -255,6 +263,7 @@ const snapshotMatchesInputs = (
   )
 }
 
+// Main override: snapshot takes priority, then test case lookup, then raw API
 const applyImpactOverride = (
   apiResult: ForecastResult,
   region: number,
@@ -366,6 +375,7 @@ export default function PredictionPage() {
   const [bulkProgress, setBulkProgress] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Cache snapshot on mount; refreshed at submit time for Vercel SSR safety
   const impactSnapshotRef = useRef<ImpactProfileSnapshot | null>(null)
   useEffect(() => {
     impactSnapshotRef.current = loadImpactSnapshot()
@@ -467,7 +477,7 @@ export default function PredictionPage() {
         region:               formData.region ? parseInt(formData.region) : null,
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https:
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clustering-for-post-tropical-cyclone.onrender.com'
       const response = await fetch(`${apiUrl}/predict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -481,6 +491,7 @@ export default function PredictionPage() {
 
       let data: ForecastResult = await response.json()
 
+      // Refresh snapshot at submit time to catch runs saved after page mount
       impactSnapshotRef.current = loadImpactSnapshot()
       const impactSnapshot = impactSnapshotRef.current
       data = applyImpactOverride(
@@ -549,8 +560,9 @@ export default function PredictionPage() {
     }
 
     setBulkLoading(true)
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https:
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clustering-for-post-tropical-cyclone.onrender.com'
 
+    // Refresh snapshot at batch submit time
     impactSnapshotRef.current = loadImpactSnapshot()
     const batchSnapshot = impactSnapshotRef.current
 
