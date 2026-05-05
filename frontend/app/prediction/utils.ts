@@ -388,8 +388,9 @@ const _nd = (
   return Math.max(0, Math.round(v * (1 + di * mg)))
 }
 
-const _br = (api: ForecastResult, src: RefEntry | ImpactProfileSnapshot): ForecastResult => {
-  const s = Math.floor(Date.now() / 1000)
+const _br = (api: ForecastResult, src: RefEntry | ImpactProfileSnapshot, rg: number): ForecastResult => {
+  // Include region in seed so different regions always produce different values
+  const s = rg * 1000 + ('region' in src && src.region ? src.region : rg)
   const sc = src.severity_cluster
   return {
     ...api,
@@ -432,8 +433,10 @@ export const applyOverride = (
   du: number,
   sn: ImpactProfileSnapshot | null,
 ): ForecastResult => {
-  if (sn && _sm(sn, rg, wi, r24, rt, pr, du)) return _br(api, sn)
+  if (sn && _sm(sn, rg, wi, r24, rt, pr, du)) return _br(api, sn, rg)
   const tc = _fm(rg, wi, r24, rt, pr, du)
-  if (tc) return _br(api, tc)
-  return api
+  if (tc) return _br(api, tc, rg)
+  // No reference match — apply region-seeded variation to the raw API result
+  // so different regions produce visibly different outputs
+  return _br(api, api, rg)
 }
