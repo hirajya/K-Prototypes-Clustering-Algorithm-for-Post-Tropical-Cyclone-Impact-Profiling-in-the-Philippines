@@ -2,9 +2,58 @@
 
 declare const process: { env: { [key: string]: string | undefined } };
 
+import { useState, useEffect, useMemo, useRef } from 'react'
+import {
+  ResponsiveContainer,
+  BarChart,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Bar,
+  LabelList,
+  Cell,
+} from 'recharts'
 import { loadImpactSnapshot, applyOverride } from './utils'
 
-const initialFormData: FormData = {
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type CycloneFormData = {
+  max_sustained_wind: string
+  max_24hr_rainfall: string
+  total_storm_rainfall: string
+  min_pressure: string
+  duration: string
+  region: string
+  start_datetime: string
+  end_datetime: string
+}
+
+type ForecastResult = {
+  severity_cluster: number
+  severity_label: string
+  severity_description?: string
+  message?: string
+  families: number
+  persons: number
+  barangays: number
+  dead: number
+  injured: number
+  missing: number
+  totally_damaged: number
+  partially_damaged: number
+}
+
+type BulkRow = {
+  input: Record<string, string>
+  result?: ForecastResult
+  error?: string
+}
+
+type ImpactProfileSnapshot = ReturnType<typeof loadImpactSnapshot>
+
+// ─── Constants & pure helpers ─────────────────────────────────────────────────
+
+const initialFormData: CycloneFormData = {
   max_sustained_wind: '',
   max_24hr_rainfall: '',
   total_storm_rainfall: '',
@@ -25,8 +74,8 @@ const VALID_REGIONS = [
 const getTyphoonType = (maxSustainedWind: number): { type: number; label: string } => {
   if (maxSustainedWind > 184) return { type: 4, label: 'STY - Super Typhoon' }
   else if (maxSustainedWind >= 118) return { type: 3, label: 'TY - Typhoon' }
-  else if (maxSustainedWind >= 89)  return { type: 2, label: 'STS - Severe Tropical Storm' }
-  else if (maxSustainedWind >= 62)  return { type: 0, label: 'TS - Tropical Storm' }
+  else if (maxSustainedWind >= 89) return { type: 2, label: 'STS - Severe Tropical Storm' }
+  else if (maxSustainedWind >= 62) return { type: 0, label: 'TS - Tropical Storm' }
   else return { type: 1, label: 'TD - Tropical Depression' }
 }
 
@@ -63,8 +112,11 @@ const getSeverityDesc = (cluster: number) => {
 const formatDatetime = (dt: string): string => {
   if (!dt) return '—'
   return new Date(dt).toLocaleString('en-PH', {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 
@@ -77,9 +129,11 @@ const BarLabel = (props: { x?: number; y?: number; width?: number; value?: numbe
   )
 }
 
+// ─── Page component ───────────────────────────────────────────────────────────
+
 export default function PredictionPage() {
   const [activeTab, setActiveTab] = useState<'instance' | 'batch'>('instance')
-  const [formData, setFormData] = useState<FormData>(initialFormData)
+  const [formData, setFormData] = useState<CycloneFormData>(initialFormData)
   const [result, setResult] = useState<ForecastResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -114,7 +168,7 @@ export default function PredictionPage() {
     validateFormData(updated)
   }
 
-  const validateFormData = (data: FormData): boolean => {
+  const validateFormData = (data: CycloneFormData): boolean => {
     const errors: Record<string, string> = {}
 
     const wind = parseFloat(data.max_sustained_wind)
@@ -185,16 +239,18 @@ export default function PredictionPage() {
 
     try {
       const payload = {
-        max_sustained_wind:   parseFloat(formData.max_sustained_wind) || 0,
-        max_24hr_rainfall:    parseFloat(formData.max_24hr_rainfall) || 0,
+        max_sustained_wind: parseFloat(formData.max_sustained_wind) || 0,
+        max_24hr_rainfall: parseFloat(formData.max_24hr_rainfall) || 0,
         total_storm_rainfall: parseFloat(formData.total_storm_rainfall) || 0,
-        min_pressure:         parseFloat(formData.min_pressure) || 0,
-        duration:             computedDuration,
-        typhoon_type:         typhoonClassification.type,
-        region:               formData.region ? parseInt(formData.region) : null,
+        min_pressure: parseFloat(formData.min_pressure) || 0,
+        duration: computedDuration,
+        typhoon_type: typhoonClassification.type,
+        region: formData.region ? parseInt(formData.region) : null,
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clustering-for-post-tropical-cyclone.onrender.com'
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ||
+        'https://clustering-for-post-tropical-cyclone.onrender.com'
       const response = await fetch(`${apiUrl}/predict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -202,7 +258,9 @@ export default function PredictionPage() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Failed to get prediction' }))
+        const errorData = await response
+          .json()
+          .catch(() => ({ detail: 'Failed to get prediction' }))
         throw new Error(errorData.detail || 'Failed to get prediction')
       }
 
@@ -242,11 +300,13 @@ export default function PredictionPage() {
   const parseCSV = (text: string): Record<string, string>[] => {
     const lines = text.trim().split('\n')
     if (lines.length < 2) return []
-    const headers = lines[0].split(',').map(h => h.trim())
-    return lines.slice(1).map(line => {
-      const values = line.split(',').map(v => v.trim())
+    const headers = lines[0].split(',').map((h) => h.trim())
+    return lines.slice(1).map((line) => {
+      const values = line.split(',').map((v) => v.trim())
       const row: Record<string, string> = {}
-      headers.forEach((h, i) => { row[h] = values[i] || '' })
+      headers.forEach((h, i) => {
+        row[h] = values[i] || ''
+      })
       return row
     })
   }
@@ -262,9 +322,15 @@ export default function PredictionPage() {
     const text = await file.text()
     const rows = parseCSV(text)
 
-    const requiredCols = ['max_sustained_wind', 'max_24hr_rainfall', 'total_storm_rainfall', 'min_pressure', 'duration']
+    const requiredCols = [
+      'max_sustained_wind',
+      'max_24hr_rainfall',
+      'total_storm_rainfall',
+      'min_pressure',
+      'duration',
+    ]
     const headers = Object.keys(rows[0] || {})
-    const missing = requiredCols.filter(c => !headers.includes(c))
+    const missing = requiredCols.filter((c) => !headers.includes(c))
 
     if (missing.length > 0) {
       setBulkError(`CSV is missing required columns: ${missing.join(', ')}`)
@@ -277,7 +343,9 @@ export default function PredictionPage() {
     }
 
     setBulkLoading(true)
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://clustering-for-post-tropical-cyclone.onrender.com'
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL ||
+      'https://clustering-for-post-tropical-cyclone.onrender.com'
 
     // Refresh snapshot at batch submit time
     impactSnapshotRef.current = loadImpactSnapshot()
@@ -297,13 +365,13 @@ export default function PredictionPage() {
 
       try {
         const payload = {
-          max_sustained_wind:   wind,
-          max_24hr_rainfall:    rainfall24,
+          max_sustained_wind: wind,
+          max_24hr_rainfall: rainfall24,
           total_storm_rainfall: rainfallTotal,
-          min_pressure:         pressure,
-          duration:             duration,
-          typhoon_type:         tc.type,
-          region:               regionVal || null,
+          min_pressure: pressure,
+          duration: duration,
+          typhoon_type: tc.type,
+          region: regionVal || null,
         }
 
         const response = await fetch(`${apiUrl}/predict`, {
@@ -316,9 +384,16 @@ export default function PredictionPage() {
           results.push({ input: row, error: `Row ${i + 1}: API error` })
         } else {
           let data: ForecastResult = await response.json()
-
-          data = applyOverride(data, regionVal, wind, rainfall24, rainfallTotal, pressure, duration, batchSnapshot)
-
+          data = applyOverride(
+            data,
+            regionVal,
+            wind,
+            rainfall24,
+            rainfallTotal,
+            pressure,
+            duration,
+            batchSnapshot,
+          )
           results.push({ input: row, result: data })
         }
       } catch {
@@ -336,21 +411,43 @@ export default function PredictionPage() {
     if (bulkRows.length === 0) return
 
     const headers = [
-      'max_sustained_wind', 'max_24hr_rainfall', 'total_storm_rainfall', 'min_pressure', 'duration', 'region',
-      'families', 'persons', 'barangays', 'dead', 'injured', 'missing',
-      'totally_damaged', 'partially_damaged', 'severity_cluster', 'severity_label'
+      'max_sustained_wind',
+      'max_24hr_rainfall',
+      'total_storm_rainfall',
+      'min_pressure',
+      'duration',
+      'region',
+      'families',
+      'persons',
+      'barangays',
+      'dead',
+      'injured',
+      'missing',
+      'totally_damaged',
+      'partially_damaged',
+      'severity_cluster',
+      'severity_label',
     ]
 
-    const rows = bulkRows.map(row => {
+    const rows = bulkRows.map((row: BulkRow) => {
       const r = row.result
       return [
-        row.input.max_sustained_wind, row.input.max_24hr_rainfall,
-        row.input.total_storm_rainfall, row.input.min_pressure, row.input.duration,
+        row.input.max_sustained_wind,
+        row.input.max_24hr_rainfall,
+        row.input.total_storm_rainfall,
+        row.input.min_pressure,
+        row.input.duration,
         row.input.region ?? '',
-        r?.families ?? '', r?.persons ?? '', r?.barangays ?? '',
-        r?.dead ?? '', r?.injured ?? '', r?.missing ?? '',
-        r?.totally_damaged ?? '', r?.partially_damaged ?? '',
-        r?.severity_cluster ?? '', r?.severity_label ?? (row.error || 'Error')
+        r?.families ?? '',
+        r?.persons ?? '',
+        r?.barangays ?? '',
+        r?.dead ?? '',
+        r?.injured ?? '',
+        r?.missing ?? '',
+        r?.totally_damaged ?? '',
+        r?.partially_damaged ?? '',
+        r?.severity_cluster ?? '',
+        r?.severity_label ?? (row.error || 'Error'),
       ].join(',')
     })
 
@@ -365,7 +462,14 @@ export default function PredictionPage() {
   }
 
   const downloadTemplate = () => {
-    const headers = ['max_sustained_wind', 'max_24hr_rainfall', 'total_storm_rainfall', 'min_pressure', 'duration', 'region']
+    const headers = [
+      'max_sustained_wind',
+      'max_24hr_rainfall',
+      'total_storm_rainfall',
+      'min_pressure',
+      'duration',
+      'region',
+    ]
     const exampleRow = ['150', '100', '200', '970', '24', '5']
     const csv = [headers.join(','), exampleRow.join(',')].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -441,73 +545,128 @@ export default function PredictionPage() {
 
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Region</label>
-                      <select name="region" value={formData.region} onChange={handleInputChange}
+                      <select
+                        name="region"
+                        value={formData.region}
+                        onChange={handleInputChange}
                         className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 ${validationErrors.region ? 'border-red-500' : 'border-gray-300'}`}
-                        required>
+                        required
+                      >
                         <option value="">Select a region...</option>
-                        {VALID_REGIONS.map(r => (
+                        {VALID_REGIONS.map((r) => (
                           <option key={r.value} value={r.value}>{r.label}</option>
                         ))}
                       </select>
-                      {validationErrors.region && <p className="text-red-500 text-xs mt-1">{validationErrors.region}</p>}
+                      {validationErrors.region && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.region}</p>
+                      )}
                     </div>
 
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Max Sustained Wind (kph)</label>
-                      <input type="number" name="max_sustained_wind" value={formData.max_sustained_wind}
-                        onChange={handleInputChange} min="60" max="500" step="1"
+                      <input
+                        type="number"
+                        name="max_sustained_wind"
+                        value={formData.max_sustained_wind}
+                        onChange={handleInputChange}
+                        min="60"
+                        max="500"
+                        step="1"
                         className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.max_sustained_wind ? 'border-red-500' : 'border-gray-300'}`}
-                        required />
-                      {validationErrors.max_sustained_wind && <p className="text-red-500 text-xs mt-1">{validationErrors.max_sustained_wind}</p>}
+                        required
+                      />
+                      {validationErrors.max_sustained_wind && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.max_sustained_wind}</p>
+                      )}
                     </div>
 
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Typhoon Classification</label>
-                      <div className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">{typhoonClassification.label}</div>
+                      <div className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
+                        {typhoonClassification.label}
+                      </div>
                       <p className="text-xs text-gray-500 mt-1">Auto-detected based on max sustained wind</p>
                     </div>
 
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Max 24hr Rainfall (mm)</label>
-                      <input type="number" name="max_24hr_rainfall" value={formData.max_24hr_rainfall}
-                        onChange={handleInputChange} min="0" step="0.1"
+                      <input
+                        type="number"
+                        name="max_24hr_rainfall"
+                        value={formData.max_24hr_rainfall}
+                        onChange={handleInputChange}
+                        min="0"
+                        step="0.1"
                         className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.max_24hr_rainfall ? 'border-red-500' : 'border-gray-300'}`}
-                        required />
-                      {validationErrors.max_24hr_rainfall && <p className="text-red-500 text-xs mt-1">{validationErrors.max_24hr_rainfall}</p>}
+                        required
+                      />
+                      {validationErrors.max_24hr_rainfall && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.max_24hr_rainfall}</p>
+                      )}
                     </div>
 
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Total Storm Rainfall (mm)</label>
-                      <input type="number" name="total_storm_rainfall" value={formData.total_storm_rainfall}
-                        onChange={handleInputChange} min="0" step="0.1"
+                      <input
+                        type="number"
+                        name="total_storm_rainfall"
+                        value={formData.total_storm_rainfall}
+                        onChange={handleInputChange}
+                        min="0"
+                        step="0.1"
                         className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.total_storm_rainfall ? 'border-red-500' : 'border-gray-300'}`}
-                        required />
-                      {validationErrors.total_storm_rainfall && <p className="text-red-500 text-xs mt-1">{validationErrors.total_storm_rainfall}</p>}
+                        required
+                      />
+                      {validationErrors.total_storm_rainfall && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.total_storm_rainfall}</p>
+                      )}
                     </div>
 
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Min Pressure (hPa)</label>
-                      <input type="number" name="min_pressure" value={formData.min_pressure}
-                        onChange={handleInputChange} min="870" max="1100" step="0.1"
+                      <input
+                        type="number"
+                        name="min_pressure"
+                        value={formData.min_pressure}
+                        onChange={handleInputChange}
+                        min="870"
+                        max="1100"
+                        step="0.1"
                         className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${validationErrors.min_pressure ? 'border-red-500' : 'border-gray-300'}`}
-                        required />
-                      {validationErrors.min_pressure && <p className="text-red-500 text-xs mt-1">{validationErrors.min_pressure}</p>}
+                        required
+                      />
+                      {validationErrors.min_pressure && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.min_pressure}</p>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">Start Datetime</label>
-                        <input type="datetime-local" name="start_datetime" value={formData.start_datetime}
+                        <input
+                          type="datetime-local"
+                          name="start_datetime"
+                          value={formData.start_datetime}
                           onChange={handleInputChange}
-                          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.start_datetime ? 'border-red-500' : 'border-gray-300'}`} />
-                        {validationErrors.start_datetime && <p className="text-red-500 text-xs mt-1">{validationErrors.start_datetime}</p>}
+                          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.start_datetime ? 'border-red-500' : 'border-gray-300'}`}
+                        />
+                        {validationErrors.start_datetime && (
+                          <p className="text-red-500 text-xs mt-1">{validationErrors.start_datetime}</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">End Datetime</label>
-                        <input type="datetime-local" name="end_datetime" value={formData.end_datetime}
-                          min={formData.start_datetime || undefined} onChange={handleInputChange}
-                          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.end_datetime ? 'border-red-500' : 'border-gray-300'}`} />
-                        {validationErrors.end_datetime && <p className="text-red-500 text-xs mt-1">{validationErrors.end_datetime}</p>}
+                        <input
+                          type="datetime-local"
+                          name="end_datetime"
+                          value={formData.end_datetime}
+                          min={formData.start_datetime || undefined}
+                          onChange={handleInputChange}
+                          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${validationErrors.end_datetime ? 'border-red-500' : 'border-gray-300'}`}
+                        />
+                        {validationErrors.end_datetime && (
+                          <p className="text-red-500 text-xs mt-1">{validationErrors.end_datetime}</p>
+                        )}
                       </div>
                     </div>
 
@@ -524,19 +683,26 @@ export default function PredictionPage() {
                     <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                       <p className="text-red-700 text-sm font-semibold">Please fix the following errors:</p>
                       <ul className="list-disc list-inside text-red-600 text-sm mt-2">
-                        {Object.values(validationErrors).map((err, idx) => <li key={idx}>{err}</li>)}
+                        {Object.values(validationErrors).map((err: string, idx: number) => (
+                          <li key={idx}>{err}</li>
+                        ))}
                       </ul>
                     </div>
                   )}
 
                   <div className="flex gap-4 mt-8">
-                    <button type="submit"
+                    <button
+                      type="submit"
                       disabled={loading || Object.keys(validationErrors).length > 0}
-                      className={`flex-1 px-6 py-3 font-semibold rounded-lg transition-colors ${loading || Object.keys(validationErrors).length > 0 ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                      className={`flex-1 px-6 py-3 font-semibold rounded-lg transition-colors ${loading || Object.keys(validationErrors).length > 0 ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                    >
                       {loading ? 'Processing...' : 'Predict Damage'}
                     </button>
-                    <button type="button" onClick={handleReset}
-                      className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors">
+                    <button
+                      type="button"
+                      onClick={handleReset}
+                      className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors"
+                    >
                       Reset
                     </button>
                   </div>
@@ -598,7 +764,19 @@ export default function PredictionPage() {
 
                       <div className="grid grid-cols-2 gap-3">
                         <div className={`col-span-2 p-4 rounded-lg border-2 ${getSeverityBorder(result.severity_cluster)}`}>
-                          <p className="text-xs font-medium mb-2" style={{ color: result.severity_cluster === 1 ? '#991b1b' : result.severity_cluster === 2 ? '#9a3412' : '#14532d' }}>Predicted Severity Level</p>
+                          <p
+                            className="text-xs font-medium mb-2"
+                            style={{
+                              color:
+                                result.severity_cluster === 1
+                                  ? '#991b1b'
+                                  : result.severity_cluster === 2
+                                  ? '#9a3412'
+                                  : '#14532d',
+                            }}
+                          >
+                            Predicted Severity Level
+                          </p>
                           <div className="flex items-center gap-3">
                             <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${getSeverityBadge(result.severity_cluster)}`}>
                               Cluster {result.severity_cluster}
@@ -656,7 +834,9 @@ export default function PredictionPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                       </div>
-                      <p className="text-gray-500 text-sm">Select a region, enter weather data, and click &quot;Predict Damage&quot; to see results</p>
+                      <p className="text-gray-500 text-sm">
+                        Select a region, enter weather data, and click &quot;Predict Damage&quot; to see results
+                      </p>
                     </div>
                   )}
                 </div>
@@ -668,81 +848,83 @@ export default function PredictionPage() {
               <>
                 <div className="flex items-center gap-4 mt-2 mb-2">
                   <div className="flex-1 h-px bg-gray-200" />
-                  <span className="text-sm font-semibold text-gray-400 uppercase tracking-widest whitespace-nowrap">Prediction Summary Visualization</span>
+                  <span className="text-sm font-semibold text-gray-400 uppercase tracking-widest whitespace-nowrap">
+                    Prediction Summary Visualization
+                  </span>
                   <div className="flex-1 h-px bg-gray-200" />
                 </div>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">People Affected</h3>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart
-                      data={[
-                        { name: 'Families',  value: result.families },
-                        { name: 'Persons',   value: result.persons },
-                        { name: 'Barangays', value: result.barangays },
-                      ]}
-                      margin={{ top: 20, right: 10, left: 10, bottom: 0 }}
-                    >
-                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(value: unknown) => (value as number).toLocaleString()} />
-                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                        <LabelList dataKey="value" content={<BarLabel />} />
-                        <Cell fill="#3b82f6" />
-                        <Cell fill="#6366f1" />
-                        <Cell fill="#8b5cf6" />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">People Affected</h3>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart
+                        data={[
+                          { name: 'Families', value: result.families },
+                          { name: 'Persons', value: result.persons },
+                          { name: 'Barangays', value: result.barangays },
+                        ]}
+                        margin={{ top: 20, right: 10, left: 10, bottom: 0 }}
+                      >
+                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <Tooltip formatter={(value: unknown) => (value as number).toLocaleString()} />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                          <LabelList dataKey="value" content={<BarLabel />} />
+                          <Cell fill="#3b82f6" />
+                          <Cell fill="#6366f1" />
+                          <Cell fill="#8b5cf6" />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Casualties</h3>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart
-                      data={[
-                        { name: 'Dead',    value: result.dead },
-                        { name: 'Injured', value: result.injured },
-                        { name: 'Missing', value: result.missing },
-                      ]}
-                      margin={{ top: 20, right: 10, left: 10, bottom: 0 }}
-                    >
-                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(value: unknown) => (value as number).toLocaleString()} />
-                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                        <LabelList dataKey="value" content={<BarLabel />} />
-                        <Cell fill="#ef4444" />
-                        <Cell fill="#f97316" />
-                        <Cell fill="#eab308" />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Casualties</h3>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart
+                        data={[
+                          { name: 'Dead', value: result.dead },
+                          { name: 'Injured', value: result.injured },
+                          { name: 'Missing', value: result.missing },
+                        ]}
+                        margin={{ top: 20, right: 10, left: 10, bottom: 0 }}
+                      >
+                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <Tooltip formatter={(value: unknown) => (value as number).toLocaleString()} />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                          <LabelList dataKey="value" content={<BarLabel />} />
+                          <Cell fill="#ef4444" />
+                          <Cell fill="#f97316" />
+                          <Cell fill="#eab308" />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Housing Damage</h3>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart
-                      data={[
-                        { name: 'Totally Damaged',   value: result.totally_damaged },
-                        { name: 'Partially Damaged', value: result.partially_damaged },
-                      ]}
-                      margin={{ top: 20, right: 10, left: 10, bottom: 0 }}
-                    >
-                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(value: unknown) => (value as number).toLocaleString()} />
-                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                        <LabelList dataKey="value" content={<BarLabel />} />
-                        <Cell fill="#7c3aed" />
-                        <Cell fill="#ec4899" />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Housing Damage</h3>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart
+                        data={[
+                          { name: 'Totally Damaged', value: result.totally_damaged },
+                          { name: 'Partially Damaged', value: result.partially_damaged },
+                        ]}
+                        margin={{ top: 20, right: 10, left: 10, bottom: 0 }}
+                      >
+                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <Tooltip formatter={(value: unknown) => (value as number).toLocaleString()} />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                          <LabelList dataKey="value" content={<BarLabel />} />
+                          <Cell fill="#7c3aed" />
+                          <Cell fill="#ec4899" />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
-              </div>
-            </>
+              </>
             )}
           </>
         )}
@@ -753,8 +935,10 @@ export default function PredictionPage() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold text-gray-900">Batch Prediction</h2>
-                <button onClick={downloadTemplate}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 bg-white text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                <button
+                  onClick={downloadTemplate}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 bg-white text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
@@ -762,14 +946,23 @@ export default function PredictionPage() {
                 </button>
               </div>
 
-              <label htmlFor="csv-upload"
-                className="flex flex-col items-center justify-center w-full h-44 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors mb-6">
+              <label
+                htmlFor="csv-upload"
+                className="flex flex-col items-center justify-center w-full h-44 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors mb-6"
+              >
                 <svg className="w-10 h-10 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
                 <p className="text-sm font-medium text-gray-700 mb-1">Click to upload CSV file</p>
                 <p className="text-xs text-gray-400">Supports .csv</p>
-                <input id="csv-upload" ref={fileInputRef} type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
+                <input
+                  id="csv-upload"
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
               </label>
 
               <div className="bg-blue-50 rounded-xl border border-blue-100 p-4">
@@ -785,7 +978,10 @@ export default function PredictionPage() {
 
               {bulkRows.length > 0 && !bulkLoading && (
                 <div className="flex justify-end mt-4">
-                  <button onClick={handleBulkReset} className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-300 transition-colors">
+                  <button
+                    onClick={handleBulkReset}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-300 transition-colors"
+                  >
                     Clear
                   </button>
                 </div>
@@ -804,7 +1000,10 @@ export default function PredictionPage() {
                     <span>{bulkProgress}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{ width: `${bulkProgress}%` }} />
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${bulkProgress}%` }}
+                    />
                   </div>
                 </div>
               )}
@@ -817,8 +1016,10 @@ export default function PredictionPage() {
                     <h2 className="text-xl font-semibold text-gray-900">Results</h2>
                     <p className="text-sm text-gray-500 mt-1">{bulkRows.length} rows processed</p>
                   </div>
-                  <button onClick={downloadCSV}
-                    className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+                  <button
+                    onClick={downloadCSV}
+                    className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
@@ -830,19 +1031,37 @@ export default function PredictionPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-200">
-                        {['#','Wind (kph)','Pressure (hPa)','Duration (hrs)','Region','Severity','Families','Persons','Dead','Injured','Missing','Totally Dmg','Partially Dmg'].map(h => (
-                          <th key={h} className="text-left py-3 px-3 text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>
+                        {[
+                          '#',
+                          'Wind (kph)',
+                          'Pressure (hPa)',
+                          'Duration (hrs)',
+                          'Region',
+                          'Severity',
+                          'Families',
+                          'Persons',
+                          'Dead',
+                          'Injured',
+                          'Missing',
+                          'Totally Dmg',
+                          'Partially Dmg',
+                        ].map((h) => (
+                          <th key={h} className="text-left py-3 px-3 text-xs font-semibold text-gray-500 whitespace-nowrap">
+                            {h}
+                          </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {bulkRows.map((row, idx) => (
+                      {bulkRows.map((row: BulkRow, idx: number) => (
                         <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="py-3 px-3 text-gray-500 text-xs">{idx + 1}</td>
                           <td className="py-3 px-3 font-medium">{row.input.max_sustained_wind}</td>
                           <td className="py-3 px-3">{row.input.min_pressure}</td>
                           <td className="py-3 px-3">{row.input.duration}</td>
-                          <td className="py-3 px-3 text-gray-600">{row.input.region ? `Region ${row.input.region}` : '—'}</td>
+                          <td className="py-3 px-3 text-gray-600">
+                            {row.input.region ? `Region ${row.input.region}` : '—'}
+                          </td>
                           <td className="py-3 px-3">
                             {row.result ? (
                               <span className={`text-xs font-bold px-2 py-1 rounded-full ${getSeverityBadge(row.result.severity_cluster)}`}>
