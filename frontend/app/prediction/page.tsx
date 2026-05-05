@@ -948,6 +948,12 @@ export default function PredictionPage() {
 
             {/* Charts */}
             {result && (
+              <>
+                <div className="flex items-center gap-4 mt-2 mb-2">
+                  <div className="flex-1 h-px bg-gray-200" />
+                  <span className="text-sm font-semibold text-gray-400 uppercase tracking-widest whitespace-nowrap">Prediction Summary Visualization</span>
+                  <div className="flex-1 h-px bg-gray-200" />
+                </div>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">People Affected</h3>
@@ -1019,6 +1025,7 @@ export default function PredictionPage() {
                   </ResponsiveContainer>
                 </div>
               </div>
+            </>
             )}
           </>
         )}
